@@ -41,17 +41,34 @@ export const musicPlayerConfig: MusicPlayerConfig = {
 	},
 
 	// 本地音乐配置（当 mode 为 'local' 时使用）
-	// 1. 支持传入歌词文件的路径
-	// lrc: "/assets/music/lrc/使一颗心免于哀伤-哼唱.lrc",
-	// 2. 或者直接填入歌词字符串内容
-	// lrc: "[00:00.00]歌词内容...",
 	local: {
 		playlist: [
 			{
-				name: "使一颗心免于哀伤",
-				artist: "知更鸟 / HOYO-MiX / Chevy",
-				url: "/assets/music/使一颗心免于哀伤-哼唱.mp3",
-				cover: "/assets/music/cover/109951169585655912.webp",
+				name: "后会无期",
+				artist: "汪苏泷",
+				url: "/assets/music/后会无期.mp3",
+				cover: "",
+				lrc: "",
+			},
+			{
+				name: "坏女孩",
+				artist: "徐良",
+				url: "/assets/music/坏女孩.mp3",
+				cover: "",
+				lrc: "",
+			},
+			{
+				name: "绿色",
+				artist: "陈雪凝",
+				url: "/assets/music/绿色.mp3",
+				cover: "",
+				lrc: "",
+			},
+			{
+				name: "素颜",
+				artist: "许嵩 / 何曼婷",
+				url: "/assets/music/素颜.mp3",
+				cover: "",
 				lrc: "",
 			},
 		],
