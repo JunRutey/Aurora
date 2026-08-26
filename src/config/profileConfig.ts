@@ -33,11 +33,5 @@ export const profileConfig: ProfileConfig = {
 			url: "mailto:JunRutey@outlook.com",
 			showName: false,
 		},
-		{
-			name: "RSS",
-			icon: "fa7-solid:rss",
-			url: "/rss/",
-			showName: false,
-		},
 	],
 };
