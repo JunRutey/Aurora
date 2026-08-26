@@ -1,7 +1,7 @@
 import rss from "@astrojs/rss";
 import type { APIContext } from "astro";
 import { siteConfig } from "@/config";
-import { getAllPosts } from "@/utils/content-utils";
+import { getSortedPosts } from "@/utils/content-utils";
 import { formatDateI18nWithTime } from "@/utils/date";
 import { url } from "@/utils/url-utils";
 import i18nKey from "../i18n/i18nKey";
@@ -9,7 +9,7 @@ import { i18n } from "../i18n/translation";
 import pkg from "../../package.json";
 
 export async function GET(context: APIContext) {
-	const posts = await getAllPosts();
+	const posts = await getSortedPosts();
 	return rss({
 		title: siteConfig.title,
 		description: siteConfig.description,
@@ -29,7 +29,7 @@ export async function GET(context: APIContext) {
 		</image>
 		<generator>${i18n(i18nKey.rssWhatIsRSS)}</generator>
 		<templateThemeVersion>${pkg.version}</templateThemeVersion>
-		<templateThemeUrl>https://github.com/CuteLeaf/Firefly</templateThemeUrl>
+		<templateThemeUrl>https://github.com/JunRutey/Firefly</templateThemeUrl>
 		<lastBuildDate>${formatDateI18nWithTime(new Date())}</lastBuildDate>`,
 	});
 }
