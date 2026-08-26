@@ -2,7 +2,7 @@ import rss from "@astrojs/rss";
 import type { APIContext } from "astro";
 import { siteConfig } from "@/config";
 import { getSortedPosts } from "@/utils/content-utils";
-import { formatDateI18nWithTime } from "@/utils/date";
+import { formatDateI18nWithTime } from "@/utils/date-utils";
 import { url } from "@/utils/url-utils";
 import i18nKey from "../i18n/i18nKey";
 import { i18n } from "../i18n/translation";
