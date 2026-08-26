@@ -43,7 +43,7 @@ export const siteConfig: SiteConfig = {
 	title: "JunRutey的小窝",
 
 	// 站点副标题
-	subtitle: "二次元日常分享～",
+	subtitle: "",
 
 	// 站点 URL
 	site_url: "https://junrutey.github.io",
