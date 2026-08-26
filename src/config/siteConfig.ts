@@ -46,7 +46,7 @@ export const siteConfig: SiteConfig = {
 	subtitle: "二次元日常分享～",
 
 	// 站点 URL
-	site_url: "https://junrutey.github.io",
+	site_url: "https://firefly.junrutey.workers.dev",
 
 	// 站点描述
 	description:
