@@ -62,8 +62,13 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 			// 书签导航
 			LinkPresets.Booknav,
 
-			// 哔哩哔哩追番
-			LinkPresets.Bilibili,
+			// 哔哩哔哩主页
+			{
+				name: "哔哩哔哩",
+				url: "https://space.bilibili.com/1390351725",
+				external: true,
+				icon: "fa7-brands:bilibili",
+			},
 		],
 	});
 
