@@ -1,0 +1,110 @@
+/* ===== 粉蓝渐变主题色 ===== */
+
+/* 主渐变色 - 粉色到蓝色 */
+:root {
+  --gradient-pink: oklch(0.70 0.14 345);
+  --gradient-blue: oklch(0.70 0.14 240);
+  --gradient-main: linear-gradient(135deg, var(--gradient-pink) 0%, var(--gradient-blue) 100%);
+  --gradient-main-hover: linear-gradient(135deg, oklch(0.75 0.14 345) 0%, oklch(0.75 0.14 240) 100%);
+  --gradient-main-active: linear-gradient(135deg, oklch(0.65 0.14 345) 0%, oklch(0.65 0.14 240) 100%);
+}
+
+:root.dark {
+  --gradient-pink: oklch(0.75 0.14 345);
+  --gradient-blue: oklch(0.75 0.14 240);
+  --gradient-main: linear-gradient(135deg, var(--gradient-pink) 0%, var(--gradient-blue) 100%);
+  --gradient-main-hover: linear-gradient(135deg, oklch(0.80 0.14 345) 0%, oklch(0.80 0.14 240) 100%);
+  --gradient-main-active: linear-gradient(135deg, oklch(0.70 0.14 345) 0%, oklch(0.70 0.14 240) 100%);
+}
+
+/* 渐变文字效果 */
+.gradient-text {
+  background: var(--gradient-main);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* 渐变按钮 */
+.btn-gradient {
+  background: var(--gradient-main) !important;
+  color: white !important;
+  border: none !important;
+  transition: all 0.3s ease !important;
+}
+
+.btn-gradient:hover {
+  background: var(--gradient-main-hover) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 107, 157, 0.3);
+}
+
+.btn-gradient:active {
+  background: var(--gradient-main-active) !important;
+  transform: translateY(0);
+}
+
+/* 应用到分页按钮 */
+.post-list-pagination .btn-card.text-\(--primary\) {
+  background: var(--gradient-main) !important;
+  color: white !important;
+}
+
+.post-list-pagination .btn-card.text-\(--primary\):hover {
+  background: var(--gradient-main-hover) !important;
+}
+
+/* 应用到导航栏激活项 */
+.navbar .nav-item.active {
+  color: var(--gradient-pink) !important;
+}
+
+/* 应用到标签 */
+.tag-pill {
+  background: var(--gradient-main) !important;
+  color: white !important;
+}
+
+/* 应用到分类按钮 */
+.category-pill[data-active] {
+  background: var(--gradient-main) !important;
+  color: white !important;
+}
+
+/* 应用到侧边栏小标题 */
+.widget-title::before {
+  background: var(--gradient-main) !important;
+}
+
+/* 应用到链接悬停效果 */
+.custom-md a:hover {
+  background: var(--gradient-main);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* 应用到搜索高亮 */
+.search-panel mark {
+  background: transparent !important;
+  background: var(--gradient-main) !important;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* 应用到代码组标签 */
+.rehype-code-group .rcg-tab.active {
+  border-bottom-color: var(--gradient-pink) !important;
+  color: var(--gradient-pink) !important;
+}
+
+/* 应用到时间线节点 */
+.timeline-item .timeline-node {
+  background: var(--gradient-main) !important;
+}
+
+/* 应用到步骤编号 */
+.step-item .step-number {
+  background: var(--gradient-main) !important;
+}
