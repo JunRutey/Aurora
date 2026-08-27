@@ -83,7 +83,6 @@ const labels = {
 
   var encryptedData = container.getAttribute('data-encrypted');
   var slug = container.getAttribute('data-slug');
-  var cacheKey = 'pw:' + slug;
 
   var ui = document.getElementById('password-ui');
   var form = document.getElementById('password-form');
@@ -178,6 +177,33 @@ const labels = {
     return new TextDecoder().decode(decrypted);
   }
 
+  // 通过缓存桥接层读写密码（替代直接 sessionStorage 操作）
+  function getPassword(slug: string): string | null {
+    try {
+      // @ts-expect-error __cache 由 CacheInit.astro 安装
+      return window.__cache?.content?.getPassword(slug) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  function setPassword(slug: string, password: string): void {
+    try {
+      // @ts-expect-error __cache 由 CacheInit.astro 安装
+      window.__cache?.content?.setPassword(slug, password);
+    } catch {
+      // 静默
+    }
+  }
+
+  function removePassword(slug: string): void {
+    try {
+      sessionStorage.removeItem('pw:' + slug);
+    } catch {
+      // 静默
+    }
+  }
+
   // Handle form submit
   form.addEventListener('submit', function(e) {
     e.preventDefault();
@@ -185,7 +211,7 @@ const labels = {
     if (!pwd) return;
     hideError();
     decrypt(pwd).then(function(html) {
-      sessionStorage.setItem(cacheKey, pwd);
+      setPassword(slug, pwd);
       showContent(html);
     }).catch(function() {
       showError();
@@ -193,12 +219,12 @@ const labels = {
   });
 
   // Try cached password
-  var cached = sessionStorage.getItem(cacheKey);
+  var cached = getPassword(slug);
   if (cached) {
     decrypt(cached).then(function(html) {
       showContent(html);
     }).catch(function() {
-      sessionStorage.removeItem(cacheKey);
+      removePassword(slug);
     });
   }
 })();

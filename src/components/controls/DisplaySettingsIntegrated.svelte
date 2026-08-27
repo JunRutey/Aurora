@@ -44,6 +44,7 @@ import {
 	setWallpaperMode,
 	setWavesEnabled,
 } from "@utils/setting-utils";
+import { setSetting, getSetting } from "@/cache/settings-cache";
 import { onMount } from "svelte";
 import Icon from "@/components/common/Icon.svelte";
 import {
@@ -314,9 +315,11 @@ function resetWallpaperMode() {
 	setWallpaperMode(defaultWallpaperMode);
 }
 
+import { setSetting, getSetting } from "@/cache/settings-cache";
+
 function resetLayout() {
 	currentLayout = effectiveDefaultLayout;
-	localStorage.removeItem("postListLayout");
+	setSetting("postListLayout", "");
 
 	// 触发自定义事件，通知页面布局已改变
 	const event = new CustomEvent("layoutChange", {
@@ -485,7 +488,7 @@ function switchLayout() {
 
 	isSwitching = true;
 	currentLayout = currentLayout === "list" ? "grid" : "list";
-	localStorage.setItem("postListLayout", currentLayout);
+	setSetting("postListLayout", currentLayout);
 
 	// 触发自定义事件，通知页面布局已改变
 	const event = new CustomEvent("layoutChange", {
@@ -503,35 +506,21 @@ onMount(() => {
 	mounted = true;
 	checkScreenSize();
 
-	// 从localStorage读取保存的壁纸模式
+	// 从缓存系统读取用户偏好（SettingsCache 统一管理）
 	wallpaperMode = getStoredWallpaperMode();
-
-	// 从localStorage读取水波纹动画状态
 	wavesEnabled = getStoredWavesEnabled();
-
-	// 从localStorage读取渐变过渡状态
 	gradientEnabled = getStoredGradientEnabled();
-
-	// 从localStorage读取横幅标题状态
 	bannerTitleEnabled = getStoredBannerTitleEnabled();
-
-	// 从localStorage读取横幅轮播状态
 	bannerCarouselEnabled = getStoredBannerCarouselEnabled();
-
-	// 从localStorage读取樱花特效状态
 	sakuraEnabled = getStoredSakuraEnabled();
-
-	// 从localStorage读取卡片样式状态
 	cardBorderEnabled = getStoredCardBorderEnabled();
 	cardFollowThemeEnabled = getStoredCardFollowThemeEnabled();
-
-	// 从localStorage读取全屏透明设置状态
 	overlayOpacity = getStoredOverlayOpacity();
 	overlayBlur = getStoredOverlayBlur();
 	overlayCardOpacity = getStoredOverlayCardOpacity();
 
-	// 从localStorage读取用户偏好布局
-	const savedLayout = localStorage.getItem("postListLayout");
+	// 从缓存读取用户偏好布局
+	const savedLayout = getSetting("postListLayout", "");
 	if (savedLayout && (savedLayout === "list" || savedLayout === "grid")) {
 		currentLayout = savedLayout;
 	} else {

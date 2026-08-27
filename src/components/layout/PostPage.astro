@@ -64,7 +64,9 @@ const coverPositionClass =
 <!-- 立即执行脚本：防止刷新时的布局闪烁 -->
 <script is:inline define:vars={{ defaultLayout, mobileDefaultLayout, columnWidth }}>
   (function() {
-    const savedLayout = localStorage.getItem('postListLayout');
+    const savedLayout = (window.__cache && window.__cache.settings)
+      ? window.__cache.settings.get('postListLayout')
+      : localStorage.getItem('postListLayout');
     // 根据视口宽度确定有效的默认布局
     const effectiveDefault = window.innerWidth < 780 ? mobileDefaultLayout : defaultLayout;
     // 低于380px强制网格模式
@@ -101,7 +103,9 @@ const coverPositionClass =
     if (!postListContainer) return;
 
     // 从localStorage读取用户偏好
-    const savedLayout = localStorage.getItem("postListLayout");
+    const savedLayout = (window.__cache && window.__cache.settings)
+      ? window.__cache.settings.get('postListLayout')
+      : localStorage.getItem("postListLayout");
     const defaultLayout =
       postListContainer.getAttribute("data-default-layout") || "list";
     const mobileDefaultLayout =

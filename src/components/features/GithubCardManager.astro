@@ -4,13 +4,12 @@
 // 构建期只在 github-card-data.json 里缓存「静态兜底信息」（description / language /
 // avatarUrl / license），forks / stars 由浏览器运行时向 api.github.com 请求一次，
 // 写入 localStorage 缓存（24h 过期后重新请求）；请求失败则回退到构建期的静态信息。
+//
+// 已迁移到客户端缓存系统 (src/cache/)，通过 window.__cache 统一管理
 // 复用 markdown-extend.styl 里已存在的 .fetch-waiting / .fetch-error / pulsate 状态样式。
 ---
 <script>
   import { formatCount } from "@/utils/github-card-utils";
-
-  const CACHE_KEY_PREFIX = "github-card:";
-  const CACHE_TTL = 24 * 60 * 60 * 1000; // 24h
 
   interface GithubApiRepo {
     description: string | null;
@@ -25,24 +24,11 @@
   const inflight = new Map<string, Promise<GithubApiRepo | null>>();
   const done = new Set<string>();
 
-  function cacheKey(repo: string): string {
-    return CACHE_KEY_PREFIX + repo.toLowerCase();
-  }
-
+  // 通过缓存桥接层读写（替代直接 localStorage 操作）
   function readCache(repo: string): GithubApiRepo | null {
     try {
-      const raw = localStorage.getItem(cacheKey(repo));
-      if (!raw) return null;
-      const entry = JSON.parse(raw) as {
-        data?: GithubApiRepo;
-        fetchedAt?: number;
-      };
-      const data = entry.data;
-      if (!data || typeof entry.fetchedAt !== "number") return null;
-      if (typeof data.stargazers_count !== "number" || typeof data.forks !== "number")
-        return null;
-      if (Date.now() - entry.fetchedAt >= CACHE_TTL) return null;
-      return data;
+      // @ts-expect-error __cache 由 CacheInit.astro 安装
+      return window.__cache?.content?.getGithubCard(repo) ?? null;
     } catch {
       return null;
     }
@@ -50,10 +36,8 @@
 
   function writeCache(repo: string, data: GithubApiRepo): void {
     try {
-      localStorage.setItem(
-        cacheKey(repo),
-        JSON.stringify({ data, fetchedAt: Date.now() }),
-      );
+      // @ts-expect-error __cache 由 CacheInit.astro 安装
+      window.__cache?.content?.setGithubCard(repo, data);
     } catch {
       // 隐私模式 / 配额失败时静默跳过，不影响卡片渲染
     }

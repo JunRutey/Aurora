@@ -199,7 +199,9 @@ const { state, backgroundImages, title, bannerPostMeta } = Astro.props;
 
             function isCarouselEnabled() {
                 if (!switchable) return defaultEnabled;
-                var stored = localStorage.getItem('bannerCarouselEnabled');
+                var stored = (window.__cache && window.__cache.settings)
+                  ? window.__cache.settings.get('bannerCarouselEnabled')
+                  : localStorage.getItem('bannerCarouselEnabled');
                 if (stored === null) return defaultEnabled;
                 return stored === 'true';
             }

@@ -1,0 +1,71 @@
+---
+// 缓存系统 — Head 引导脚本
+// 在 <head> 中插入 <script is:inline>，首屏关键路径，提供 window.__cache 最小实例
+---
+
+<script is:inline>
+// 防止重复初始化（Swup 切页会重跑）
+if (!window.__cache) {
+  window.__cache = {
+    settings: {
+      get: function(key) {
+        try { return localStorage.getItem(key); } catch { return null; }
+      },
+      set: function(key, value) {
+        try { localStorage.setItem(key, String(value)); } catch (e) { /* quota */ }
+      },
+      getTyped: function(key, fallback) {
+        var raw = this.get(key);
+        if (raw === null) return fallback;
+        if (typeof fallback === "boolean") return (raw === "true");
+        if (typeof fallback === "number") {
+          var n = Number.parseFloat(raw);
+          return Number.isFinite(n) ? n : fallback;
+        }
+        return raw;
+      }
+    },
+    content: {
+      getGithubCard: function(repo) {
+        try {
+          var raw = localStorage.getItem("ff:content:1:github:" + repo.toLowerCase());
+          if (!raw) return null;
+          var entry = JSON.parse(raw);
+          if (!entry || !entry.data) return null;
+          if (Date.now() - entry.fetchedAt >= 86400000) return null;
+          return entry.data;
+        } catch { return null; }
+      },
+      setGithubCard: function(repo, data) {
+        try {
+          localStorage.setItem("ff:content:1:github:" + repo.toLowerCase(),
+            JSON.stringify({ data: data, fetchedAt: Date.now(), version: 1 }));
+        } catch (e) { /* quota */ }
+      },
+      getPassword: function(slug) {
+        try { return sessionStorage.getItem("pw:" + slug); } catch { return null; }
+      },
+      setPassword: function(slug, password) {
+        try { sessionStorage.setItem("pw:" + slug, password); } catch (e) { /* quota */ }
+      },
+      getFailedCovers: function() {
+        try { return new Set(JSON.parse(localStorage.getItem("ff:failed-covers") || "[]")); }
+        catch { return new Set(); }
+      },
+      addFailedCover: function(url) {
+        try {
+          var failed = this.getFailedCovers();
+          failed.add(url);
+          localStorage.setItem("ff:failed-covers", JSON.stringify(Array.from(failed).slice(-200)));
+        } catch (e) { /* quota */ }
+      }
+    },
+    assets: {
+      fetch: function(url, init) { return fetch(url, init); },
+      match: function() { return Promise.resolve(undefined); }
+    },
+    cachedFetch: function(url, init) { return fetch(url, init); },
+    _version: "bootstrap"
+  };
+}
+</script>

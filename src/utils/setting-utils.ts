@@ -1,3 +1,12 @@
+/**
+ * 用户偏好管理
+ *
+ * 已迁移到客户端缓存系统 (src/cache/)，通过 SettingsCache 统一管理
+ * 本文件保留所有 DOM 操作和业务逻辑函数，只替换存储层
+ *
+ * @author CuteLeaf <xiaye@msn.com>
+ */
+
 import {
 	DARK_MODE,
 	DEFAULT_THEME,
@@ -16,8 +25,14 @@ import {
 	siteConfig,
 } from "../config";
 import { isHomePage as checkIsHomePage } from "./layout-utils";
+import { getSettingsCache } from "@/cache/settings-cache";
 
-// Declare global functions
+// ─── 缓存便捷访问 ─────────────────────────────────────────────
+
+const settings = () => getSettingsCache();
+
+// ─── 全局声明 ─────────────────────────────────────────────────
+
 declare global {
 	interface Window {
 		initSemifullScrollDetection?: () => void;
@@ -25,9 +40,16 @@ declare global {
 	}
 }
 
+// ─── 工具函数 ─────────────────────────────────────────────────
+
+function clampNumber(value: number, min: number, max: number): number {
+	return Math.min(max, Math.max(min, value));
+}
+
+// ─── 主题默认值 ───────────────────────────────────────────────
+
 export function getDefaultHue(): number {
 	const fallback = "250";
-	// 检查是否在浏览器环境中
 	if (typeof document === "undefined") {
 		return Number.parseInt(fallback, 10);
 	}
@@ -36,12 +58,9 @@ export function getDefaultHue(): number {
 }
 
 export function getDefaultTheme(): LIGHT_DARK_MODE {
-	// 如果配置文件中设置了 defaultMode，使用配置的值
-	// 否则使用 DEFAULT_THEME（向后兼容）
 	return siteConfig.themeColor.defaultMode ?? DEFAULT_THEME;
 }
 
-// 获取系统主题
 export function getSystemTheme(): LIGHT_DARK_MODE {
 	if (typeof window === "undefined") {
 		return LIGHT_MODE;
@@ -51,7 +70,6 @@ export function getSystemTheme(): LIGHT_DARK_MODE {
 		: LIGHT_MODE;
 }
 
-// 解析主题（如果是system模式，则获取系统主题）
 export function resolveTheme(theme: LIGHT_DARK_MODE): LIGHT_DARK_MODE {
 	if (theme === SYSTEM_MODE) {
 		return getSystemTheme();
@@ -59,47 +77,31 @@ export function resolveTheme(theme: LIGHT_DARK_MODE): LIGHT_DARK_MODE {
 	return theme;
 }
 
+// ─── Hue ──────────────────────────────────────────────────────
+
 export function getHue(): number {
-	// 先检查全局对象
-	if (typeof window === "undefined" || !window.localStorage) {
-		return getDefaultHue();
-	}
-	const stored = localStorage.getItem("hue");
+	if (typeof window === "undefined") return getDefaultHue();
+	const stored = settings().get("hue");
 	return stored ? Number.parseInt(stored, 10) : getDefaultHue();
 }
 
 export function setHue(hue: number): void {
-	// 先检查是否在浏览器环境
-	if (
-		typeof window === "undefined" ||
-		!window.localStorage ||
-		typeof document === "undefined"
-	) {
-		return;
-	}
-	localStorage.setItem("hue", String(hue));
+	if (typeof window === "undefined" || typeof document === "undefined") return;
+	settings().set("hue", String(hue));
 	const r = document.querySelector(":root") as HTMLElement;
-	if (!r) {
-		return;
-	}
-	r.style.setProperty("--hue", String(hue));
+	if (r) r.style.setProperty("--hue", String(hue));
 }
 
+// ─── 主题 DOM 操作 ────────────────────────────────────────────
+
 export function applyThemeToDocument(theme: LIGHT_DARK_MODE): void {
-	// 检查是否在浏览器环境中
-	if (typeof document === "undefined") {
-		return;
-	}
+	if (typeof document === "undefined") return;
 
-	// 解析主题
 	const resolvedTheme = resolveTheme(theme);
-
-	// 获取当前主题状态的完整信息
 	const currentIsDark = document.documentElement.classList.contains("dark");
 	const currentTheme = document.documentElement.getAttribute("data-theme");
 
-	// 计算目标主题状态
-	let targetIsDark = false; // 初始化默认值
+	let targetIsDark = false;
 	switch (resolvedTheme) {
 		case LIGHT_MODE:
 			targetIsDark = false;
@@ -108,31 +110,19 @@ export function applyThemeToDocument(theme: LIGHT_DARK_MODE): void {
 			targetIsDark = true;
 			break;
 		default:
-			// 处理默认情况，使用当前主题状态
 			targetIsDark = currentIsDark;
 			break;
 	}
 
-	// 检测是否真的需要主题切换：
-	// 1. dark类状态是否改变
-	// 2. expressiveCode主题是否需要更新
 	const needsThemeChange = currentIsDark !== targetIsDark;
 	const expectedTheme = targetIsDark
 		? expressiveCodeConfig.darkTheme
 		: expressiveCodeConfig.lightTheme;
 	const needsCodeThemeUpdate = currentTheme !== expectedTheme;
 
-	// 如果既不需要主题切换也不需要代码主题更新，直接返回
-	if (!needsThemeChange && !needsCodeThemeUpdate) {
-		return;
-	}
+	if (!needsThemeChange && !needsCodeThemeUpdate) return;
 
-	// 批量 DOM 操作，减少重绘
 	if (needsThemeChange) {
-		// 添加过渡保护类（但会导致大量重绘，所以使用更轻量的方式）
-		// document.documentElement.classList.add("is-theme-transitioning");
-
-		// 直接切换主题，利用 CSS 变量的特性让浏览器优化过渡
 		if (targetIsDark) {
 			document.documentElement.classList.add("dark");
 		} else {
@@ -140,149 +130,93 @@ export function applyThemeToDocument(theme: LIGHT_DARK_MODE): void {
 		}
 	}
 
-	// Set the theme for Expressive Code based on current mode
 	if (needsCodeThemeUpdate) {
 		document.documentElement.setAttribute("data-theme", expectedTheme);
 	}
 }
 
-// 系统主题监听器引用
+// ─── 系统主题监听 ─────────────────────────────────────────────
+
 let systemThemeListener:
 	| ((e: MediaQueryListEvent | MediaQueryList) => void)
 	| null = null;
 
-export function setTheme(theme: LIGHT_DARK_MODE): void {
-	// 检查是否在浏览器环境中
-	if (
-		typeof localStorage === "undefined" ||
-		typeof localStorage.setItem !== "function"
-	) {
-		return;
-	}
-
-	// 先应用主题
-	applyThemeToDocument(theme);
-
-	// 保存到localStorage
-	localStorage.setItem("theme", theme);
-
-	// 如果切换到 system 模式，需要监听系统主题变化
-	if (theme === SYSTEM_MODE) {
-		setupSystemThemeListener();
-	} else {
-		// 如果切换其他模式，移除系统主题监听
-		cleanupSystemThemeListener();
-	}
-}
-
-// 设置系统主题监听器
 export function setupSystemThemeListener(): void {
-	// 先清理之前的监听器
 	cleanupSystemThemeListener();
-
-	if (typeof window === "undefined") {
-		return;
-	}
+	if (typeof window === "undefined") return;
 
 	const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
-	// 处理系统主题变化的回调
 	const handleSystemThemeChange = (e: MediaQueryListEvent | MediaQueryList) => {
 		const isDark = e.matches;
 		const currentIsDark = document.documentElement.classList.contains("dark");
+		if (currentIsDark === isDark) return;
 
-		// 如果主题状态没有变化，直接返回
-		if (currentIsDark === isDark) {
-			return;
-		}
-
-		// 直接应用系统主题，不使用过渡保护类以避免大量重绘
 		if (isDark) {
 			document.documentElement.classList.add("dark");
 		} else {
 			document.documentElement.classList.remove("dark");
 		}
 
-		// Set the theme for Expressive Code
 		const expressiveTheme = isDark
 			? expressiveCodeConfig.darkTheme
 			: expressiveCodeConfig.lightTheme;
 		document.documentElement.setAttribute("data-theme", expressiveTheme);
-
-		// 触发自定义事件通知其他组件（仅在真正切换时触发）
 		window.dispatchEvent(new CustomEvent("theme-change"));
 	};
 
-	// 立即调用一次以设置初始状态
 	handleSystemThemeChange(mediaQuery);
 
-	// 监听系统主题变化（现代浏览器）
 	if (mediaQuery.addEventListener) {
 		mediaQuery.addEventListener("change", handleSystemThemeChange);
 	} else {
-		// 兼容旧浏览器
 		mediaQuery.addListener(handleSystemThemeChange);
 	}
 
 	systemThemeListener = handleSystemThemeChange;
 }
 
-// 清理系统主题监听器
 function cleanupSystemThemeListener() {
-	if (typeof window === "undefined" || !systemThemeListener) {
-		return;
-	}
-
+	if (typeof window === "undefined" || !systemThemeListener) return;
 	const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-
 	if (mediaQuery.removeEventListener) {
 		mediaQuery.removeEventListener("change", systemThemeListener);
 	} else {
-		// 兼容旧浏览器
 		mediaQuery.removeListener(systemThemeListener);
 	}
-
 	systemThemeListener = null;
 }
 
-export function getStoredTheme(): LIGHT_DARK_MODE {
-	// 检查是否在浏览器环境中
-	if (
-		typeof localStorage === "undefined" ||
-		typeof localStorage.getItem !== "function"
-	) {
-		return getDefaultTheme();
+// ─── 主题读写 ─────────────────────────────────────────────────
+
+export function setTheme(theme: LIGHT_DARK_MODE): void {
+	if (typeof window === "undefined") return;
+
+	applyThemeToDocument(theme);
+	settings().set("theme", theme);
+
+	if (theme === SYSTEM_MODE) {
+		setupSystemThemeListener();
+	} else {
+		cleanupSystemThemeListener();
 	}
-	return (
-		(localStorage.getItem("theme") as LIGHT_DARK_MODE) || getDefaultTheme()
-	);
 }
 
-// 初始化主题监听器（用于页面加载后）
+export function getStoredTheme(): LIGHT_DARK_MODE {
+	if (typeof window === "undefined") return getDefaultTheme();
+	return (settings().get("theme") as LIGHT_DARK_MODE) || getDefaultTheme();
+}
+
 export function initThemeListener(): void {
-	if (
-		typeof localStorage === "undefined" ||
-		typeof localStorage.getItem !== "function"
-	) {
-		return;
-	}
-
+	if (typeof window === "undefined") return;
 	const theme = getStoredTheme();
-
-	// 如果主题是 system 模式，需要监听系统主题变化
 	if (theme === SYSTEM_MODE) {
 		setupSystemThemeListener();
 	}
 }
 
-// Wallpaper mode functions
+// ─── 壁纸模式 ─────────────────────────────────────────────────
 
-/**
- * 同步首页标题显示（hidden 类）：首页 + banner/fullscreen 模式显示标题，其余情况隐藏。
- * SSR 按 config 默认模式渲染 hidden（默认 overlay/none 时带 hidden），而模式可运行时切换、
- * 页面也会经 Swup 切换（body.is-home 变化），因此需要按当前 mode + 是否首页重新计算。
- * 标题开关（user-hidden 类）独立控制，不受影响。
- */
 export function syncBannerHomeTextVisibility(): void {
 	const overlay = document.querySelector(
 		".banner-home-text-overlay",
@@ -302,7 +236,6 @@ export function applyWallpaperModeToDocument(
 	const html = document.documentElement;
 	const prevMode = html.getAttribute("data-wallpaper-mode");
 
-	// 先启用过渡类再设置模式：确保 --content-top 变化时 top 过渡已激活（否则位置瞬间到位不动画）
 	if (animate) {
 		html.classList.add("is-wallpaper-transitioning");
 		window.setTimeout(
@@ -312,17 +245,11 @@ export function applyWallpaperModeToDocument(
 	}
 
 	html.setAttribute("data-wallpaper-mode", mode);
-
-	// 首页标题显示：按当前模式 + 是否首页同步 hidden 类（SSR 按 config 默认模式渲染 hidden，
-	// 模式运行时切换后需同步）。放在标题动画之前，让下方动画的 !contains("hidden") 判断拿到最新状态。
 	syncBannerHomeTextVisibility();
 
-	// 卡片透明类：唯一运行时写入者（解析期由 body 起始脚本写入）
 	const transparent = mode === "overlay" || mode === "fullscreen";
 	document.body.classList.toggle("wallpaper-transparent", transparent);
 
-	// 标题上下移动动画：banner ↔ fullscreen 切换时 wrapper 高度瞬时变化，
-	// 用 transform 补偿后滑到居中位置（首页标题可见时才动画）
 	if (
 		(mode === WALLPAPER_FULLSCREEN && prevMode === WALLPAPER_BANNER) ||
 		(mode === WALLPAPER_BANNER && prevMode === WALLPAPER_FULLSCREEN)
@@ -354,19 +281,13 @@ export function updateNavbarTransparency(mode: WALLPAPER_MODE): void {
 	let transparentMode: string;
 	let blurAmount: number;
 
-	// 根据当前壁纸模式设置导航栏透明模式和模糊效果
 	if (mode === WALLPAPER_OVERLAY) {
-		// 全屏透明模式
 		transparentMode = "none";
 		blurAmount = 0;
 	} else if (mode === WALLPAPER_NONE) {
-		// 纯色背景模式
 		transparentMode = "none";
 		blurAmount = 0;
 	} else if (mode === WALLPAPER_FULLSCREEN) {
-		// 全屏壁纸模式：脱离 banner 导航栏配置，导航栏默认完全透明
-		// （透明度由卡片透明度 cardOpacity 经 wallpaper-transparent 控制）；
-		// 若开启 fullscreen.navbar.dynamicTransparent，首页顶部透明、下滑后变不透明（semifull）
 		const isHomePage = checkIsHomePage(window.location.pathname);
 		const dynamicTransparent =
 			backgroundWallpaper.fullscreen?.navbar?.dynamicTransparent ?? false;
@@ -378,85 +299,61 @@ export function updateNavbarTransparency(mode: WALLPAPER_MODE): void {
 			blurAmount = 0;
 		}
 	} else {
-		// Banner模式：使用配置的透明模式和模糊效果
 		transparentMode =
 			backgroundWallpaper.banner?.navbar?.transparentMode || "semi";
 		blurAmount = backgroundWallpaper.banner?.navbar?.blur ?? 20;
 	}
 
-	// 更新导航栏的透明模式属性
 	navbar.setAttribute("data-transparent-mode", transparentMode);
 	navbar.style.setProperty("--navbar-glass-blur", `${blurAmount}px`);
 
-	// 移除现有的透明模式类
 	navbar.classList.remove(
 		"navbar-transparent-semi",
 		"navbar-transparent-full",
 		"navbar-transparent-semifull",
 	);
 
-	// 移除scrolled类
 	navbar.classList.remove("scrolled");
 
-	// 滚动检测功能
 	if (
 		transparentMode === "semifull" &&
 		(mode === WALLPAPER_BANNER || mode === WALLPAPER_FULLSCREEN) &&
 		typeof window.initSemifullScrollDetection === "function"
 	) {
-		// 在Banner和全屏壁纸模式的semifull下启用滚动检测
 		window.initSemifullScrollDetection();
 	} else if (window.semifullScrollHandler) {
-		// 移除滚动监听器
 		window.removeEventListener("scroll", window.semifullScrollHandler);
 		delete window.semifullScrollHandler;
 	}
 }
 
 export function setWallpaperMode(mode: WALLPAPER_MODE): void {
-	// 检查是否在浏览器环境中
-	if (
-		typeof localStorage === "undefined" ||
-		typeof localStorage.setItem !== "function"
-	) {
-		return;
-	}
-	localStorage.setItem("wallpaperMode", mode);
+	if (typeof window === "undefined") return;
+	settings().set("wallpaperMode", mode);
 	applyWallpaperModeToDocument(mode);
 }
 
 export function initWallpaperMode(): void {
-	// 初始化透明模式参数（透明度/模糊度/卡片透明度）
 	applyStoredOverlaySettingsToDocument();
 	const storedMode = getStoredWallpaperMode();
 	applyWallpaperModeToDocument(storedMode, false);
 }
 
 export function getStoredWallpaperMode(): WALLPAPER_MODE {
-	// 检查是否在浏览器环境中
-	if (
-		typeof localStorage === "undefined" ||
-		typeof localStorage.getItem !== "function"
-	) {
-		return backgroundWallpaper.mode;
-	}
+	if (typeof window === "undefined") return backgroundWallpaper.mode;
 
 	const isSwitchable = displaySettingsConfig.wallpaperModeSwitchable;
 	if (!isSwitchable) {
-		localStorage.removeItem("wallpaperMode");
 		return backgroundWallpaper.mode;
 	}
 
 	return (
-		(localStorage.getItem("wallpaperMode") as WALLPAPER_MODE) ||
+		(settings().get("wallpaperMode") as WALLPAPER_MODE) ||
 		backgroundWallpaper.mode
 	);
 }
 
-// Overlay settings functions
-function clampNumber(value: number, min: number, max: number): number {
-	return Math.min(max, Math.max(min, value));
-}
+// ─── Overlay 设置 ──────────────────────────────────────────────
 
 export function getDefaultOverlayOpacity(): number {
 	return backgroundWallpaper.overlay?.opacity ?? 0.8;
@@ -471,77 +368,34 @@ export function getDefaultOverlayCardOpacity(): number {
 }
 
 export function getStoredOverlayOpacity(): number {
-	if (
-		typeof localStorage === "undefined" ||
-		typeof localStorage.getItem !== "function"
-	) {
-		return getDefaultOverlayOpacity();
-	}
-	const stored = localStorage.getItem("overlayOpacity");
-	if (stored === null) {
-		return getDefaultOverlayOpacity();
-	}
-	const parsed = Number.parseFloat(stored);
-	if (Number.isNaN(parsed)) {
-		return getDefaultOverlayOpacity();
-	}
-	return clampNumber(parsed, 0, 1);
+	if (typeof window === "undefined") return getDefaultOverlayOpacity();
+	const stored = settings().getTyped("overlayOpacity", getDefaultOverlayOpacity());
+	return clampNumber(stored, 0, 1);
 }
 
 export function getStoredOverlayBlur(): number {
-	if (
-		typeof localStorage === "undefined" ||
-		typeof localStorage.getItem !== "function"
-	) {
-		return getDefaultOverlayBlur();
-	}
-	const stored = localStorage.getItem("overlayBlur");
-	if (stored === null) {
-		return getDefaultOverlayBlur();
-	}
-	const parsed = Number.parseFloat(stored);
-	if (Number.isNaN(parsed)) {
-		return getDefaultOverlayBlur();
-	}
-	return clampNumber(parsed, 0, 20);
+	if (typeof window === "undefined") return getDefaultOverlayBlur();
+	const stored = settings().getTyped("overlayBlur", getDefaultOverlayBlur());
+	return clampNumber(stored, 0, 20);
 }
 
 export function getStoredOverlayCardOpacity(): number {
-	if (
-		typeof localStorage === "undefined" ||
-		typeof localStorage.getItem !== "function"
-	) {
-		return getDefaultOverlayCardOpacity();
-	}
-	const stored = localStorage.getItem("overlayCardOpacity");
-	if (stored === null) {
-		return getDefaultOverlayCardOpacity();
-	}
-	const parsed = Number.parseFloat(stored);
-	if (Number.isNaN(parsed)) {
-		return getDefaultOverlayCardOpacity();
-	}
-	return clampNumber(parsed, 0, 1);
+	if (typeof window === "undefined") return getDefaultOverlayCardOpacity();
+	const stored = settings().getTyped("overlayCardOpacity", getDefaultOverlayCardOpacity());
+	return clampNumber(stored, 0, 1);
 }
 
 export function applyOverlayOpacityToDocument(opacity: number): void {
-	if (typeof document === "undefined") {
-		return;
-	}
+	if (typeof document === "undefined") return;
 	const safeOpacity = clampNumber(opacity, 0, 1);
 	const wallpaperWrapper = document.getElementById("wallpaper-wrapper");
 	if (wallpaperWrapper) {
-		wallpaperWrapper.style.setProperty(
-			"--overlay-opacity",
-			String(safeOpacity),
-		);
+		wallpaperWrapper.style.setProperty("--overlay-opacity", String(safeOpacity));
 	}
 }
 
 export function applyOverlayBlurToDocument(blur: number): void {
-	if (typeof document === "undefined") {
-		return;
-	}
+	if (typeof document === "undefined") return;
 	const safeBlur = clampNumber(blur, 0, 20);
 	const wallpaperWrapper = document.getElementById("wallpaper-wrapper");
 	if (wallpaperWrapper) {
@@ -550,9 +404,7 @@ export function applyOverlayBlurToDocument(blur: number): void {
 }
 
 export function applyOverlayCardOpacityToDocument(cardOpacity: number): void {
-	if (typeof document === "undefined") {
-		return;
-	}
+	if (typeof document === "undefined") return;
 	const safeCardOpacity = clampNumber(cardOpacity, 0, 1);
 	document.documentElement.style.setProperty(
 		"--card-transparent-opacity",
@@ -562,33 +414,24 @@ export function applyOverlayCardOpacityToDocument(cardOpacity: number): void {
 
 export function setOverlayOpacity(opacity: number): void {
 	const safeOpacity = clampNumber(opacity, 0, 1);
-	if (
-		typeof localStorage !== "undefined" &&
-		typeof localStorage.setItem === "function"
-	) {
-		localStorage.setItem("overlayOpacity", String(safeOpacity));
+	if (typeof window !== "undefined") {
+		settings().set("overlayOpacity", String(safeOpacity));
 	}
 	applyOverlayOpacityToDocument(safeOpacity);
 }
 
 export function setOverlayBlur(blur: number): void {
 	const safeBlur = clampNumber(blur, 0, 20);
-	if (
-		typeof localStorage !== "undefined" &&
-		typeof localStorage.setItem === "function"
-	) {
-		localStorage.setItem("overlayBlur", String(safeBlur));
+	if (typeof window !== "undefined") {
+		settings().set("overlayBlur", String(safeBlur));
 	}
 	applyOverlayBlurToDocument(safeBlur);
 }
 
 export function setOverlayCardOpacity(cardOpacity: number): void {
 	const safeCardOpacity = clampNumber(cardOpacity, 0, 1);
-	if (
-		typeof localStorage !== "undefined" &&
-		typeof localStorage.setItem === "function"
-	) {
-		localStorage.setItem("overlayCardOpacity", String(safeCardOpacity));
+	if (typeof window !== "undefined") {
+		settings().set("overlayCardOpacity", String(safeCardOpacity));
 	}
 	applyOverlayCardOpacityToDocument(safeCardOpacity);
 }
@@ -599,11 +442,11 @@ export function applyStoredOverlaySettingsToDocument(): void {
 	applyOverlayCardOpacityToDocument(getStoredOverlayCardOpacity());
 }
 
-// Waves animation functions
+// ─── Waves 动画 ────────────────────────────────────────────────
+
 export function getDefaultWavesEnabled(): boolean {
 	const wavesConfig = backgroundWallpaper.banner?.waves?.enable;
 	if (typeof wavesConfig === "object") {
-		// 如果是分设备配置，检查当前设备
 		const isMobile =
 			typeof window !== "undefined" ? window.innerWidth < 768 : false;
 		return isMobile
@@ -614,37 +457,19 @@ export function getDefaultWavesEnabled(): boolean {
 }
 
 export function getStoredWavesEnabled(): boolean {
-	if (
-		typeof localStorage === "undefined" ||
-		typeof localStorage.getItem !== "function"
-	) {
-		return getDefaultWavesEnabled();
-	}
-	const stored = localStorage.getItem("wavesEnabled");
-	if (stored === null) {
-		return getDefaultWavesEnabled();
-	}
-	return stored === "true";
+	if (typeof window === "undefined") return getDefaultWavesEnabled();
+	return settings().getTyped("wavesEnabled", getDefaultWavesEnabled());
 }
 
 export function setWavesEnabled(enabled: boolean): void {
-	if (
-		typeof localStorage === "undefined" ||
-		typeof localStorage.setItem !== "function"
-	) {
-		return;
-	}
-	localStorage.setItem("wavesEnabled", String(enabled));
+	if (typeof window === "undefined") return;
+	settings().set("wavesEnabled", String(enabled));
 	applyWavesEnabledToDocument(enabled);
 }
 
 export function applyWavesEnabledToDocument(enabled: boolean): void {
-	if (typeof document === "undefined") {
-		return;
-	}
-	// 更新 html 属性，CSS 会立即生效
+	if (typeof document === "undefined") return;
 	document.documentElement.setAttribute("data-waves-enabled", String(enabled));
-	// 同时更新元素样式（兼容性）
 	const wavesElement = document.getElementById("header-waves");
 	if (wavesElement) {
 		if (enabled) {
@@ -657,7 +482,8 @@ export function applyWavesEnabledToDocument(enabled: boolean): void {
 	}
 }
 
-// Gradient transition functions
+// ─── Gradient 过渡 ─────────────────────────────────────────────
+
 export function getDefaultGradientEnabled(): boolean {
 	const gradientConfig = backgroundWallpaper.banner?.gradient?.enable;
 	if (typeof gradientConfig === "object") {
@@ -671,38 +497,19 @@ export function getDefaultGradientEnabled(): boolean {
 }
 
 export function getStoredGradientEnabled(): boolean {
-	if (
-		typeof localStorage === "undefined" ||
-		typeof localStorage.getItem !== "function"
-	) {
-		return getDefaultGradientEnabled();
-	}
-	const stored = localStorage.getItem("gradientEnabled");
-	if (stored === null) {
-		return getDefaultGradientEnabled();
-	}
-	return stored === "true";
+	if (typeof window === "undefined") return getDefaultGradientEnabled();
+	return settings().getTyped("gradientEnabled", getDefaultGradientEnabled());
 }
 
 export function setGradientEnabled(enabled: boolean): void {
-	if (
-		typeof localStorage === "undefined" ||
-		typeof localStorage.setItem !== "function"
-	) {
-		return;
-	}
-	localStorage.setItem("gradientEnabled", String(enabled));
+	if (typeof window === "undefined") return;
+	settings().set("gradientEnabled", String(enabled));
 	applyGradientEnabledToDocument(enabled);
 }
 
 export function applyGradientEnabledToDocument(enabled: boolean): void {
-	if (typeof document === "undefined") {
-		return;
-	}
-	document.documentElement.setAttribute(
-		"data-gradient-enabled",
-		String(enabled),
-	);
+	if (typeof document === "undefined") return;
+	document.documentElement.setAttribute("data-gradient-enabled", String(enabled));
 	const gradientElement = document.getElementById("wallpaper-gradient");
 	if (gradientElement) {
 		if (enabled) {
@@ -715,20 +522,14 @@ export function applyGradientEnabledToDocument(enabled: boolean): void {
 	}
 }
 
-// Sakura effect functions (disabled - feature removed)
-export function getDefaultSakuraEnabled(): boolean {
-	return false;
-}
+// ─── Sakura 特效（已移除）────────────────────────────────────
 
-export function getStoredSakuraEnabled(): boolean {
-	return false;
-}
+export function getDefaultSakuraEnabled(): boolean { return false; }
+export function getStoredSakuraEnabled(): boolean { return false; }
+export function setSakuraEnabled(_enabled: boolean): void {}
 
-export function setSakuraEnabled(_enabled: boolean): void {
-	// No-op - sakura effect removed
-}
+// ─── Banner 标题 ──────────────────────────────────────────────
 
-// Banner title functions
 export function getDefaultBannerTitleEnabled(): boolean {
 	return backgroundWallpaper.common?.homeText?.enable ?? true;
 }
@@ -738,57 +539,28 @@ export function getDefaultBannerCarouselEnabled(): boolean {
 }
 
 export function getStoredBannerTitleEnabled(): boolean {
-	if (
-		typeof localStorage === "undefined" ||
-		typeof localStorage.getItem !== "function"
-	) {
-		return getDefaultBannerTitleEnabled();
-	}
-	const stored = localStorage.getItem("bannerTitleEnabled");
-	if (stored === null) {
-		return getDefaultBannerTitleEnabled();
-	}
-	return stored === "true";
+	if (typeof window === "undefined") return getDefaultBannerTitleEnabled();
+	return settings().getTyped("bannerTitleEnabled", getDefaultBannerTitleEnabled());
 }
 
 export function getStoredBannerCarouselEnabled(): boolean {
 	const isSwitchable = displaySettingsConfig.bannerCarouselSwitchable;
-	if (!isSwitchable) {
-		return getDefaultBannerCarouselEnabled();
-	}
-	if (
-		typeof localStorage === "undefined" ||
-		typeof localStorage.getItem !== "function"
-	) {
-		return getDefaultBannerCarouselEnabled();
-	}
-	const stored = localStorage.getItem("bannerCarouselEnabled");
-	if (stored === null) {
-		return getDefaultBannerCarouselEnabled();
-	}
-	return stored === "true";
+	if (!isSwitchable) return getDefaultBannerCarouselEnabled();
+	if (typeof window === "undefined") return getDefaultBannerCarouselEnabled();
+	return settings().getTyped("bannerCarouselEnabled", getDefaultBannerCarouselEnabled());
 }
 
 export function setBannerTitleEnabled(enabled: boolean): void {
-	if (
-		typeof localStorage === "undefined" ||
-		typeof localStorage.setItem !== "function"
-	) {
-		return;
-	}
-	localStorage.setItem("bannerTitleEnabled", String(enabled));
+	if (typeof window === "undefined") return;
+	settings().set("bannerTitleEnabled", String(enabled));
 	applyBannerTitleEnabledToDocument(enabled);
 }
 
 export function setBannerCarouselEnabled(enabled: boolean): void {
 	const safeEnabled = !!enabled;
 	const isSwitchable = displaySettingsConfig.bannerCarouselSwitchable;
-	if (
-		isSwitchable &&
-		typeof localStorage !== "undefined" &&
-		typeof localStorage.setItem === "function"
-	) {
-		localStorage.setItem("bannerCarouselEnabled", String(safeEnabled));
+	if (isSwitchable && typeof window !== "undefined") {
+		settings().set("bannerCarouselEnabled", String(safeEnabled));
 	}
 	applyBannerCarouselEnabledToDocument(safeEnabled);
 	if (typeof window !== "undefined") {
@@ -801,15 +573,11 @@ export function setBannerCarouselEnabled(enabled: boolean): void {
 }
 
 export function applyBannerTitleEnabledToDocument(enabled: boolean): void {
-	if (typeof document === "undefined") {
-		return;
-	}
-	// 更新 html 属性，CSS 会立即生效
+	if (typeof document === "undefined") return;
 	document.documentElement.setAttribute(
 		"data-banner-title-enabled",
 		String(enabled),
 	);
-	// 同时更新元素样式（兼容性）
 	const bannerTextOverlay = document.querySelector(
 		".banner-home-text-overlay",
 	) as HTMLElement;
@@ -823,39 +591,27 @@ export function applyBannerTitleEnabledToDocument(enabled: boolean): void {
 }
 
 export function applyBannerCarouselEnabledToDocument(enabled: boolean): void {
-	if (typeof document === "undefined") {
-		return;
-	}
+	if (typeof document === "undefined") return;
 	document.documentElement.setAttribute(
 		"data-banner-carousel-enabled",
 		String(enabled),
 	);
 }
 
-// Card border functions
+// ─── 卡片边框 ─────────────────────────────────────────────────
+
 export function getDefaultCardBorderEnabled(): boolean {
 	return siteConfig.card?.border ?? false;
 }
 
 export function getStoredCardBorderEnabled(): boolean {
-	if (typeof localStorage === "undefined") {
-		return getDefaultCardBorderEnabled();
-	}
-	const stored = localStorage.getItem("cardBorderEnabled");
-	if (stored === null) {
-		return getDefaultCardBorderEnabled();
-	}
-	return stored === "true";
+	if (typeof window === "undefined") return getDefaultCardBorderEnabled();
+	return settings().getTyped("cardBorderEnabled", getDefaultCardBorderEnabled());
 }
 
 export function setCardBorderEnabled(enabled: boolean): void {
-	if (
-		typeof localStorage === "undefined" ||
-		typeof localStorage.setItem !== "function"
-	) {
-		return;
-	}
-	localStorage.setItem("cardBorderEnabled", String(enabled));
+	if (typeof window === "undefined") return;
+	settings().set("cardBorderEnabled", String(enabled));
 	if (enabled) {
 		document.documentElement.classList.add("enable-card-border");
 	} else {
@@ -863,30 +619,20 @@ export function setCardBorderEnabled(enabled: boolean): void {
 	}
 }
 
-// Card follow theme functions
+// ─── 卡片跟随主题 ─────────────────────────────────────────────
+
 export function getDefaultCardFollowThemeEnabled(): boolean {
 	return siteConfig.card?.followTheme ?? false;
 }
 
 export function getStoredCardFollowThemeEnabled(): boolean {
-	if (typeof localStorage === "undefined") {
-		return getDefaultCardFollowThemeEnabled();
-	}
-	const stored = localStorage.getItem("cardFollowThemeEnabled");
-	if (stored === null) {
-		return getDefaultCardFollowThemeEnabled();
-	}
-	return stored === "true";
+	if (typeof window === "undefined") return getDefaultCardFollowThemeEnabled();
+	return settings().getTyped("cardFollowThemeEnabled", getDefaultCardFollowThemeEnabled());
 }
 
 export function setCardFollowThemeEnabled(enabled: boolean): void {
-	if (
-		typeof localStorage === "undefined" ||
-		typeof localStorage.setItem !== "function"
-	) {
-		return;
-	}
-	localStorage.setItem("cardFollowThemeEnabled", String(enabled));
+	if (typeof window === "undefined") return;
+	settings().set("cardFollowThemeEnabled", String(enabled));
 	if (enabled) {
 		document.body.classList.add("card-follow-theme-hue");
 	} else {

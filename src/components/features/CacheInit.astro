@@ -1,0 +1,42 @@
+---
+// 缓存系统 — 完整初始化
+// 在 <head> 中作为 module script 引入（自动 defer，不阻塞首屏渲染）
+// 替换 CacheBootstrap.astro 安装的最小 bridge 为完整缓存系统实现
+---
+
+<script>
+  import { initCacheSystem, getSettingsCache, getContentCache, getAssetsCache, cachedFetch } from "@/cache";
+  import type { CacheBridge } from "@/cache/bridge";
+
+  // 初始化完整缓存系统（版本淘汰、schema 检查等）
+  initCacheSystem();
+
+  const settings = getSettingsCache();
+  const content = getContentCache();
+  const assets = getAssetsCache();
+
+  // 用完整实现替换 bootstrap bridge
+  const bridge: CacheBridge = {
+    settings: {
+      get: (key: string) => settings.get(key),
+      set: (key: string, value: unknown) => settings.set(key, value),
+      getTyped: <T>(key: string, fallback: T) => settings.getTyped(key, fallback),
+    },
+    content: {
+      getGithubCard: (repo: string) => content.getGithubCard(repo),
+      setGithubCard: (repo: string, data: unknown) => content.setGithubCard(repo, data as any),
+      getPassword: (slug: string) => content.getPassword(slug),
+      setPassword: (slug: string, password: string) => content.setPassword(slug, password),
+      getFailedCovers: () => content.getFailedCovers(),
+      addFailedCover: (url: string) => content.addFailedCover(url),
+    },
+    assets: {
+      fetch: (url: string | Request, init?: RequestInit) => assets.fetch(url, init),
+      match: (url: string) => assets.match(url),
+    },
+    cachedFetch,
+  };
+
+  // 替换 bootstrap bridge（body 内的 script 此时可能已在执行队列中）
+  (window as any).__cache = bridge;
+</script>

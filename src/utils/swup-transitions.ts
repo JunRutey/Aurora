@@ -19,6 +19,7 @@ import {
 	updateNavbarTransparency,
 } from "@/utils/setting-utils";
 import { pathsEqual, url } from "@/utils/url-utils";
+import { getSetting } from "@/cache/settings-cache";
 
 const stickyNavbar = siteConfig.navbar.stickyNavbar ?? false;
 
@@ -274,7 +275,7 @@ function registerSwupHooks(): void {
 
 		// 同步主题状态 - 解决从首页进入文章页面时代码块渲染问题
 		const storedTheme =
-			localStorage.getItem("theme") ||
+			getSetting("theme", siteConfig.themeColor.defaultMode || "light") ||
 			siteConfig.themeColor.defaultMode ||
 			"light";
 		let isDark = false;

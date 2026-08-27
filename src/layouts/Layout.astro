@@ -11,6 +11,8 @@ import MusicManager from "@components/features/MusicManager.astro";
 import MusicPlayerView from "@components/features/MusicPlayerView.astro";
 // 樱花特效已移除
 import WavesEffect from "@components/features/WavesEffect.astro";
+import CacheBootstrap from "@components/features/CacheBootstrap.astro";
+import CacheInit from "@components/features/CacheInit.astro";
 import ConfigCarrier from "@components/layout/ConfigCarrier.astro";
 
 import {
@@ -293,6 +295,9 @@ const siteLogo = await getSiteLogo();
       </script>
     )}
 
+    <!-- 缓存系统引导：theme init 之前执行，body 内脚本可立即使用 window.__cache -->
+    <CacheBootstrap />
+
     <!-- Set the theme before the page is rendered to avoid a flash -->
     <script
       is:inline
@@ -424,6 +429,9 @@ const siteLogo = await getSiteLogo();
 
     <slot name="head" />
 
+    <!-- 缓存系统完整实现：module script 自动 defer，替换 bridge 为完整缓存系统 -->
+    <CacheInit />
+
     <link
       rel="alternate"
       type="application/rss+xml"
@@ -457,19 +465,24 @@ const siteLogo = await getSiteLogo();
 
     <div id="progress-bar"></div>
 
-    {/* 卡片样式：根据 localStorage 覆盖默认配置 */}
+    {/* 卡片样式：根据缓存覆盖默认配置 */}
     <script is:inline define:vars={{
       defaultBorder: siteConfig.card?.border ?? false,
       defaultFollowTheme: siteConfig.card?.followTheme ?? false,
     }}>
       (function() {
-        var stored = localStorage.getItem("cardBorderEnabled");
-        var border = stored !== null ? stored === "true" : defaultBorder;
+        var getSetting = window.__cache && window.__cache.settings
+          ? function(k, fb) { return window.__cache.settings.getTyped(k, fb); }
+          : function(k, fb) {
+              var v = localStorage.getItem(k);
+              return v !== null ? (typeof fb === "boolean" ? v === "true" : v) : fb;
+            };
+
+        var border = getSetting("cardBorderEnabled", defaultBorder);
         if (border) document.documentElement.classList.add("enable-card-border");
         else document.documentElement.classList.remove("enable-card-border");
 
-        stored = localStorage.getItem("cardFollowThemeEnabled");
-        var follow = stored !== null ? stored === "true" : defaultFollowTheme;
+        var follow = getSetting("cardFollowThemeEnabled", defaultFollowTheme);
         if (follow) document.body.classList.add("card-follow-theme-hue");
         else document.body.classList.remove("card-follow-theme-hue");
       })();

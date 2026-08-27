@@ -109,9 +109,11 @@ const managerConfigStr = JSON.stringify({
         currentIndex: 0,
         isPlaying: false,
         playMode: 0, // 0: list, 1: one, 2: random
-        volume: localStorage.getItem('music-player-volume') !== null
-            ? parseFloat(localStorage.getItem('music-player-volume'))
-            : (config.volume || 0.7),
+        volume: (window.__cache && window.__cache.settings)
+            ? window.__cache.settings.getTyped('music-player-volume', config.volume || 0.7)
+            : (localStorage.getItem('music-player-volume') !== null
+                ? parseFloat(localStorage.getItem('music-player-volume'))
+                : (config.volume || 0.7)),
         isMuted: false,
         lyrics: [],
         currentLrcIndex: -1,
@@ -321,7 +323,11 @@ const managerConfigStr = JSON.stringify({
         state.isMuted = false;
         audio.volume = val;
         audio.muted = false;
-        localStorage.setItem('music-player-volume', val.toString());
+        if (window.__cache && window.__cache.settings) {
+            window.__cache.settings.set('music-player-volume', val.toString());
+        } else {
+            localStorage.setItem('music-player-volume', val.toString());
+        }
         emit('fm:volume', { volume: val, isMuted: false });
     }
 
