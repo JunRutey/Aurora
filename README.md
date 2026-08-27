@@ -2,10 +2,11 @@
 
 # ✨ Aurora
 
-> 基于 [Firefly](https://github.com/CuteLeaf/Firefly) 主题二次开发的个人博客仓库
+> 基于 [Firefly](https://github.com/CuteLeaf/Firefly) 主题深度定制的个人博客
 
 ![Astro](https://img.shields.io/badge/Astro-7.x-orange)
 ![TypeScript](https://img.shields.io/badge/TypeScript-blue)
+![Svelte](https://img.shields.io/badge/Svelte-5-red)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 **🌐 [在线访问](https://junrutey.github.io/Firefly/)**
@@ -16,62 +17,93 @@
 
 ## 📖 说明
 
-本仓库是 **JunRutey** 的个人博客源码，基于 [Firefly](https://github.com/CuteLeaf/Firefly) 主题进行二次定制开发。
+本仓库是 **JunRutey** 的个人博客源码，基于 [Firefly](https://github.com/CuteLeaf/Firefly) 主题进行深度二次开发，新增了客户端缓存系统、增量内容同步等底层能力。
 
-> ⚠️ **注意：** 本仓库为个人博客的存储仓库，并非可直接部署的主题模板。二次开发过程中大量使用了 AI 辅助工具，代码和配置仅供学习参考，不建议直接复用或部署。
+> ⚠️ **注意：** 本仓库为个人博客的生产仓库，并非可直接部署的主题模板。代码和配置仅供学习参考。
 
-### 与上游项目的关系
+### 项目关系
 
-| 项目 | 说明 |
-|------|------|
-| [fuwari](https://github.com/saicaca/fuwari) | Firefly 的上游模板，由 [saicaca](https://github.com/saicaca) 开发 |
-| [Firefly](https://github.com/CuteLeaf/Firefly) | 基于 fuwari 二次开发的博客主题，由 [CuteLeaf](https://github.com/CuteLeaf) 维护 |
-| **Aurora（本仓库）** | 基于 Firefly 进行个性化定制的个人博客 |
+```
+fuwari (saicaca)
+  └─ Firefly (CuteLeaf)
+       └─ Aurora (JunRutey) ← 本仓库
+```
 
-## ✨ 定制内容
+## ✨ 功能特性
 
-本仓库在 Firefly 主题基础上进行了以下定制：
+### 🎨 视觉与主题
+- 粉蓝渐变主题色（Hue 280）
+- 8 张自定义壁纸，支持自动轮播（5.5s 间隔）
+- 背景视频（720p H.264）
+- 亮色/暗色模式自动切换 + 系统主题跟随
+- 全屏壁纸模式 + 模糊渐变效果
+- 樱花/水波纹/渐变过渡等视觉特效
 
-### 主题与视觉
-- 粉蓝渐变主题色（`hue: 280` + `custom-gradient.css`）
-- 8 张自定义壁纸，支持自动轮播（间隔 5.5 秒）
-- 背景视频（720p H.264 格式）
-- 亮色/暗色模式自动切换
+### 📦 客户端缓存系统（新增）
+自研的模块化三级缓存架构，提升访客体验：
 
-### 内容与功能
-- 个人资料与签名自定义
-- 导航栏菜单精简与重排
-- B 站主页链接集成
-- 本地音乐播放器（4 首 MP3）
-- 自定义书签导航与相册
+```
+┌─ 内存层 (Map) ──────┐  热数据即时访问
+├─ localStorage 层 ───┤  持久化 + TTL + 版本淘汰
+└─ HTTP Cache API ────┘  静态资源 stale-while-revalidate
+```
 
-### 技术修改
-- RSS 构建路径修复（`getAllPosts` → `getSortedPosts`）
-- 视频格式转换（HEVC → H.264，兼容浏览器播放）
-- 背景视频路径适配 `base` 配置
+- **SettingsCache** — 14 个用户偏好的统一管理，支持新旧格式双写兼容
+- **ContentCache** — API 内容增量同步（ETag/Last-Modified 条件请求）
+- **AssetsCache** — 静态资源 HTTP Cache API 封装
+- **加载管线优化** — CacheBootstrap（Head inline）→ CacheInit（Module defer），确保首屏零阻塞
+
+### 🛠️ 技术架构
+- **框架：** Astro 7 + Svelte 5 + Tailwind CSS
+- **路由：** Swup 单页导航（页面过渡动画）
+- **代码高亮：** Expressive Code（行号 + 折叠 + 语言 Logo）
+- **构建管线：** 7 步自动化（GitHub Card → LQIP → VNDB 封面 → 构建 → 资源裁剪 → 字体子集 → 内联脚本压缩 → Pagefind 搜索）
+
+### 📝 内容功能
+- Markdown / MDX 文章支持
+- Obsidian 风格 Wiki Link（自动解析为文章卡片）
+- 加密文章（AES-256-GCM，密码缓存到 sessionStorage）
+- GitHub Repo 卡片（构建期静态数据 + 运行时 API 增量更新）
+- 本地音乐播放器
+- 书签导航与相册
+- Memos 动态（增量同步）
+- Pagefind 本地搜索
+- RSS 订阅
+
+## 🚀 快速开始
+
+```bash
+# 安装依赖
+pnpm install
+
+# 本地开发
+pnpm dev
+
+# 构建
+pnpm build
+
+# 预览构建结果
+pnpm preview
+```
 
 ## 🙏 致谢
 
-本博客的构建依赖于以下开源项目：
-
-- [**fuwari**](https://github.com/saicaca/fuwari) by [saicaca](https://github.com/saicaca) — 博客主题的上游模板
-- [**Firefly**](https://github.com/CuteLeaf/Firefly) by [CuteLeaf](https://github.com/CuteLeaf) — 本博客所采用的主题
+- [**fuwari**](https://github.com/saicaca/fuwari) by [saicaca](https://github.com/saicaca) — 上游模板
+- [**Firefly**](https://github.com/CuteLeaf/Firefly) by [CuteLeaf](https://github.com/CuteLeaf) — 博客主题
 - [**Astro**](https://astro.build) — 静态站点生成框架
+- [**Svelte**](https://svelte.dev) — UI 组件框架
 - [**Tailwind CSS**](https://tailwindcss.com) — CSS 工具类框架
-
-> 如果你参考或使用了 Firefly 的组件设计和相关代码，请注明来自 [Firefly](https://github.com/CuteLeaf/Firefly)。
 
 ## 📝 许可证
 
-本项目基于 [MIT License](https://mit-license.org/) 开源。
-
-根据 MIT 协议，你可以自由使用、修改和分发代码，但需保留原始版权声明。
+基于 [MIT License](https://mit-license.org/) 开源。
 
 ```
 MIT License
 
 Copyright (c) 2024 saicaca - fuwari
 Copyright (c) 2025 CuteLeaf - Firefly
+Copyright (c) 2026 JunRutey - Aurora
 ```
 
 ---
