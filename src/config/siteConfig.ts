@@ -55,7 +55,7 @@ export const siteConfig: SiteConfig = {
 	// 站点关键词
 	keywords: [
 		"Aurora",
-		"Firefly",
+		"Firefly 主题",
 		"Astro",
 		"博客",
 		"二次元",
