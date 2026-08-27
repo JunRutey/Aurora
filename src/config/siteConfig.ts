@@ -46,7 +46,7 @@ export const siteConfig: SiteConfig = {
 	subtitle: "",
 
 	// 站点 URL
-	site_url: "https://junrutey.github.io",
+	site_url: "https://junrutey.github.io/Aurora",
 
 	// 站点描述
 	description:
