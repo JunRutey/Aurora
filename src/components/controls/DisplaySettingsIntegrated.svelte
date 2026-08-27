@@ -315,8 +315,6 @@ function resetWallpaperMode() {
 	setWallpaperMode(defaultWallpaperMode);
 }
 
-import { setSetting, getSetting } from "@/cache/settings-cache";
-
 function resetLayout() {
 	currentLayout = effectiveDefaultLayout;
 	setSetting("postListLayout", "");

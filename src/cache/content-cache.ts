@@ -274,6 +274,7 @@ export class ContentCache {
 	 * 读取加密文章密码（sessionStorage）
 	 */
 	getPassword(slug: string): string | null {
+		if (typeof sessionStorage === "undefined") return null;
 		try {
 			return sessionStorage.getItem(`pw:${slug}`);
 		} catch {
@@ -285,6 +286,7 @@ export class ContentCache {
 	 * 写入加密文章密码（sessionStorage）
 	 */
 	setPassword(slug: string, password: string): void {
+		if (typeof sessionStorage === "undefined") return;
 		try {
 			sessionStorage.setItem(`pw:${slug}`, password);
 		} catch {
@@ -300,6 +302,7 @@ export class ContentCache {
 	 * 获取失败封面图 URL 集合
 	 */
 	getFailedCovers(): Set<string> {
+		if (typeof localStorage === "undefined") return new Set();
 		try {
 			const raw = localStorage.getItem(KEYS.failedCovers);
 			return new Set(raw ? JSON.parse(raw) : []);
@@ -312,6 +315,7 @@ export class ContentCache {
 	 * 记录失败的封面图 URL（最多保留 200 条）
 	 */
 	addFailedCover(url: string): void {
+		if (typeof localStorage === "undefined") return;
 		try {
 			const failed = this.getFailedCovers();
 			failed.add(url);

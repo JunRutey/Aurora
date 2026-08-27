@@ -52,6 +52,7 @@ export class CacheManager {
 	}
 
 	private readStorage<T>(key: string): CacheEntry<T> | null {
+		if (typeof localStorage === "undefined") return null;
 		try {
 			const raw = localStorage.getItem(this.storageKey(key));
 			if (!raw) return null;
@@ -62,6 +63,7 @@ export class CacheManager {
 	}
 
 	private writeStorage<T>(key: string, entry: CacheEntry<T>): void {
+		if (typeof localStorage === "undefined") return;
 		try {
 			localStorage.setItem(this.storageKey(key), JSON.stringify(entry));
 		} catch {
@@ -76,6 +78,7 @@ export class CacheManager {
 	}
 
 	private removeStorage(key: string): void {
+		if (typeof localStorage === "undefined") return;
 		localStorage.removeItem(this.storageKey(key));
 	}
 
@@ -152,6 +155,7 @@ export class CacheManager {
 			if (k.startsWith(prefix)) this.memory.delete(k);
 		}
 		// 清理 localStorage
+		if (typeof localStorage === "undefined") return;
 		const keysToRemove: string[] = [];
 		for (let i = 0; i < localStorage.length; i++) {
 			const k = localStorage.key(i);
@@ -167,16 +171,18 @@ export class CacheManager {
 		const fullPrefixes = keepPrefixes.map(
 			(p) => `${this.config.keyPrefix}${this.config.version}:${p}`,
 		);
-		const keysToRemove: string[] = [];
-		for (let i = 0; i < localStorage.length; i++) {
-			const k = localStorage.key(i);
-			if (k?.startsWith(this.config.keyPrefix)) {
-				if (!fullPrefixes.some((p) => k.startsWith(p))) {
-					keysToRemove.push(k);
+		if (typeof localStorage !== "undefined") {
+			const keysToRemove: string[] = [];
+			for (let i = 0; i < localStorage.length; i++) {
+				const k = localStorage.key(i);
+				if (k?.startsWith(this.config.keyPrefix)) {
+					if (!fullPrefixes.some((p) => k.startsWith(p))) {
+						keysToRemove.push(k);
+					}
 				}
 			}
+			keysToRemove.forEach((k) => localStorage.removeItem(k));
 		}
-		keysToRemove.forEach((k) => localStorage.removeItem(k));
 		this.memory.clear();
 	}
 
@@ -186,12 +192,14 @@ export class CacheManager {
 	stats(): { memoryKeys: number; storageKeys: number; storageBytes: number } {
 		let storageBytes = 0;
 		let storageKeys = 0;
-		const prefix = `${this.config.keyPrefix}${this.config.version}:`;
-		for (let i = 0; i < localStorage.length; i++) {
-			const k = localStorage.key(i);
-			if (k?.startsWith(prefix)) {
-				storageKeys++;
-				storageBytes += localStorage.getItem(k)?.length ?? 0;
+		if (typeof localStorage !== "undefined") {
+			const prefix = `${this.config.keyPrefix}${this.config.version}:`;
+			for (let i = 0; i < localStorage.length; i++) {
+				const k = localStorage.key(i);
+				if (k?.startsWith(prefix)) {
+					storageKeys++;
+					storageBytes += localStorage.getItem(k)?.length ?? 0;
+				}
 			}
 		}
 		return {
@@ -207,6 +215,7 @@ export class CacheManager {
 	 * LRU 式淘汰：按 fetchedAt 排序，删除最旧的 ratio 比例条目
 	 */
 	private evictOldest(ratio: number): void {
+		if (typeof localStorage === "undefined") return;
 		const prefix = `${this.config.keyPrefix}${this.config.version}:`;
 		const entries: { key: string; fetchedAt: number }[] = [];
 
@@ -238,6 +247,7 @@ export class CacheManager {
 	 * 启动时淘汰 schema 版本不匹配的旧数据
 	 */
 	private pruneStaleVersion(): void {
+		if (typeof localStorage === "undefined") return;
 		const prefix = `${this.config.keyPrefix}`;
 		const keysToRemove: string[] = [];
 

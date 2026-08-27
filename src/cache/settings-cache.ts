@@ -81,14 +81,16 @@ export class SettingsCache {
 		if (newValue !== null) return newValue;
 
 		// 2. 回退读旧格式裸 key
-		try {
-			const legacyValue = localStorage.getItem(key);
-			if (legacyValue !== null) {
-				// 异步迁移到新格式（不阻塞读取）
-				this.manager.set(key, legacyValue);
-				return legacyValue;
-			}
-		} catch { /* 静默 */ }
+		if (typeof localStorage !== "undefined") {
+			try {
+				const legacyValue = localStorage.getItem(key);
+				if (legacyValue !== null) {
+					// 异步迁移到新格式（不阻塞读取）
+					this.manager.set(key, legacyValue);
+					return legacyValue;
+				}
+			} catch { /* 静默 */ }
+		}
 
 		// 3. 返回默认值
 		return DEFAULTS[key] ?? null;
@@ -119,9 +121,11 @@ export class SettingsCache {
 		// 写新格式
 		this.manager.set(key, strValue);
 		// 同步写旧格式，保证 Layout.astro 内联 script 读到最新值
-		try {
-			localStorage.setItem(key, strValue);
-		} catch { /* 静默 */ }
+		if (typeof localStorage !== "undefined") {
+			try {
+				localStorage.setItem(key, strValue);
+			} catch { /* 静默 */ }
+		}
 	}
 
 	/**
@@ -165,6 +169,7 @@ export class SettingsCache {
 	 * 之后裸 key 由 set() 双写保持同步，不再需要额外迁移
 	 */
 	private migrateLegacyKeys(): void {
+		if (typeof localStorage === "undefined") return;
 		const migrated = this.manager.get<boolean>("__migrated__");
 		if (migrated) return;
 

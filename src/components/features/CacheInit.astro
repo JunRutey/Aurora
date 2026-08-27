@@ -20,7 +20,7 @@
     settings: {
       get: (key: string) => settings.get(key),
       set: (key: string, value: unknown) => settings.set(key, value),
-      getTyped: <T>(key: string, fallback: T) => settings.getTyped(key, fallback),
+      getTyped: (key: string, fallback: any) => settings.getTyped(key, fallback),
     },
     content: {
       getGithubCard: (repo: string) => content.getGithubCard(repo),
