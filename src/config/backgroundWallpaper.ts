@@ -38,30 +38,29 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 	src: {
 		// 桌面背景图片（支持单张或多张随机）
 		desktop: [
-			"assets/images/CustomWallpaper/116885360_p0.jpg",
-			"assets/images/CustomWallpaper/126757682_p0.png",
-			"assets/images/CustomWallpaper/137513259_p0.jpg",
-			"assets/images/CustomWallpaper/139379071_p0.jpg",
-			"assets/images/CustomWallpaper/140161372_p0.jpg",
-			"assets/images/CustomWallpaper/141050669_p0.jpg",
-			"assets/images/CustomWallpaper/4222454_bg.jpg",
-			"assets/images/CustomWallpaper/IMG_20260827_011649.png",
+			"assets/images/CustomWallpaper/wp1.jpg",
+			"assets/images/CustomWallpaper/wp2.jpg",
+			"assets/images/CustomWallpaper/wp3.jpg",
+			"assets/images/CustomWallpaper/wp4.jpg",
+			"assets/images/CustomWallpaper/wp5.jpg",
+			"assets/images/CustomWallpaper/wp6.jpg",
+			"assets/images/CustomWallpaper/wp7.jpg",
+			"assets/images/CustomWallpaper/wp8.jpg",
 		],
 		// 移动背景图片（支持单张或多张随机）
 		mobile: [
-			"assets/images/CustomWallpaper/116885360_p0.jpg",
-			"assets/images/CustomWallpaper/126757682_p0.png",
-			"assets/images/CustomWallpaper/137513259_p0.jpg",
-			"assets/images/CustomWallpaper/139379071_p0.jpg",
-			"assets/images/CustomWallpaper/140161372_p0.jpg",
-			"assets/images/CustomWallpaper/141050669_p0.jpg",
-			"assets/images/CustomWallpaper/4222454_bg.jpg",
-			"assets/images/CustomWallpaper/IMG_20260827_011649.png",
+			"assets/images/MobileWallpaper/m1.webp",
+			"assets/images/MobileWallpaper/m2.webp",
+			"assets/images/MobileWallpaper/m3.webp",
+			"assets/images/MobileWallpaper/m4.webp",
+			"assets/images/MobileWallpaper/m5.webp",
+			"assets/images/MobileWallpaper/m6.webp",
+			"assets/images/MobileWallpaper/m7.webp",
 		],
 		// 背景视频播放地址
 		// 支持单个视频路径（字符串）或多个视频循环（数组，参考上面壁纸配置）
 		// 支持远程视频URL，本地视频请放在 public/assets/videos/ 目录下
-		playerUrl: "/assets/videos/mihoyo-girls.mp4",
+		playerUrl: "/Firefly/assets/videos/mihoyo-girls.mp4",
 	},
 	// 横幅壁纸和全屏壁纸共享配置
 	common: {
@@ -121,9 +120,9 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 		// 壁纸轮播配置，横幅壁纸和全屏壁纸共享，仅在配置多张图片时生效
 		carousel: {
 			// 是否启用壁纸轮播；关闭时保持每次刷新随机显示一张
-			enable: false,
+			enable: true,
 			// 轮播切换间隔（毫秒）
-			interval: 5000,
+			interval: 5500,
 			// 过渡效果: 'fade' 渐变 | 'zoom' 缩放 | 'slide' 滑动 | 'kenburns' 旋转木马
 			transitionEffect: "zoom",
 		},

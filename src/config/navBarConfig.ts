@@ -86,22 +86,6 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 		],
 	});
 
-	// 自定义导航栏链接
-	links.push({
-		name: "链接",
-		url: "#",
-		icon: "material-symbols:link",
-		// 子菜单
-		children: [
-			{
-				name: "GitHub",
-				url: "https://github.com/JunRutey/Firefly",
-				external: true,
-				icon: "fa7-brands:github",
-			},
-		],
-	});
-
 	// 文档链接
 	// links.push({
 	// 	name: "文档",

@@ -1,4 +1,3 @@
-import type { SakuraManagerLike } from "./types/sakura-worker";
 import type { WavesManagerLike } from "./types/waves";
 
 declare global {
@@ -69,10 +68,6 @@ declare global {
 			playTrackByIndex: (index: number) => void;
 			loadTrack: (index: number, autoPlay: boolean) => void;
 		};
-		/** 樱花特效管理器,Worker 模式与主线程回退模式均实现该接口 */
-		sakuraManager?: SakuraManagerLike;
-		/** 樱花特效初始化守卫,确保只初始化一次(Swup 切页重跑脚本时复用) */
-		sakuraInitialized?: boolean;
 		/** 水波纹特效管理器(主线程 Canvas 2D 实现) */
 		wavesManager?: WavesManagerLike;
 		/** 水波纹特效初始化守卫,确保只初始化一次(Swup 切页重跑脚本时复用) */
