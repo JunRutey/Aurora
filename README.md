@@ -9,7 +9,7 @@
 ![Svelte](https://img.shields.io/badge/Svelte-5-red)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-**🌐 [在线访问](https://junrutey.github.io/Aurora/)**
+**🌐 [在线访问](https://junrutey.github.io/Aurora/)** | **⚙️ [评论管理](https://luoliloli.ccwu.cc/ui)**
 
 </div>
 
@@ -86,10 +86,25 @@ pnpm build
 pnpm preview
 ```
 
+## 🚀 部署信息
+
+### 托管平台
+- **前端托管：** [Vercel](https://vercel.com) — 自动化部署与全球 CDN 加速
+- **评论系统：** [Waline](https://waline.js.org) — 匿名评论系统，支持 Markdown
+- **评论数据库：** [Neon](https://neon.tech) — Serverless PostgreSQL 数据库
+- **二级域名：** [DNSHE](https://github.com/dnshe/DNSHE-FreeDomains) — 免费二级域名服务
+- **DNS 托管：** [Cloudflare](https://www.cloudflare.com) — DNS 解析与安全防护
+
+### 访问地址
+- **博客主页：** https://junrutey.github.io/Aurora/
+- **评论管理面板：** https://luoliloli.ccwu.cc/ui
+
 ## 🙏 致谢
 
 - [**fuwari**](https://github.com/saicaca/fuwari) by [saicaca](https://github.com/saicaca) — 上游模板
 - [**Firefly**](https://github.com/CuteLeaf/Firefly) by [CuteLeaf](https://github.com/CuteLeaf) — 博客主题
+- [**Waline**](https://waline.js.org) — 匿名评论系统，为博客提供评论功能
+- [**DNSHE**](https://github.com/dnshe/DNSHE-FreeDomains) — 免费二级域名服务，提供域名支持
 - [**Astro**](https://astro.build) — 静态站点生成框架
 - [**Svelte**](https://svelte.dev) — UI 组件框架
 - [**Tailwind CSS**](https://tailwindcss.com) — CSS 工具类框架
