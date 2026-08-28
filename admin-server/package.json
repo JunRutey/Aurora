@@ -1,0 +1,15 @@
+{
+  "name": "aurora-admin-server",
+  "version": "1.0.0",
+  "description": "Aurora 博客本地后台管理系统",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "gray-matter": "^4.0.3",
+    "simple-git": "^3.27.0"
+  }
+}
