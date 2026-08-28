@@ -96,63 +96,32 @@ export function formatTimezoneOffset(
 		.replace(":00", "");
 }
 
+// 按站点时区格式化日期时间（内部辅助）
+function formatWithTimezone(dateInput: Date | string, showSeconds: boolean): string {
+	const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+	const options: Intl.DateTimeFormatOptions = {
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+		hour: "2-digit",
+		minute: "2-digit",
+		hour12: false,
+	};
+	if (showSeconds) options.second = "2-digit";
+	if (siteConfig.timezone) options.timeZone = siteConfig.timezone;
+
+	// toLocaleString 返回 "MM/DD/YYYY, HH:MM:SS" 或类似格式，统一转为 YYYY-MM-DD HH:mm:ss
+	const parts = new Intl.DateTimeFormat("sv-SE", options).formatToParts(date);
+	const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+	return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}${showSeconds ? `:${get("second")}` : ""}`;
+}
+
 // 统一格式为 YYYY-MM-DD HH:mm:ss，支持站点时区
 export function formatDateTimeWithSeconds(dateInput: Date | string): string {
-	// 优先从原始字符串提取UTC时间（避免Date对象在不同时区的解析差异）
-	if (typeof dateInput === "string") {
-		const zMatch = dateInput.match(
-			/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/,
-		);
-		if (zMatch) {
-			const [, y, mo, d, h, mi, s] = zMatch;
-			return `${y}-${mo}-${d} ${h}:${mi}:${s}`;
-		}
-		const plainMatch = dateInput.match(
-			/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/,
-		);
-		if (plainMatch) {
-			return dateInput;
-		}
-	}
-
-	// 回退：从Date对象取UTC分量
-	const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
-	const y = date.getUTCFullYear();
-	const mo = String(date.getUTCMonth() + 1).padStart(2, "0");
-	const d = String(date.getUTCDate()).padStart(2, "0");
-	const h = String(date.getUTCHours()).padStart(2, "0");
-	const mi = String(date.getUTCMinutes()).padStart(2, "0");
-	const s = String(date.getUTCSeconds()).padStart(2, "0");
-
-	return `${y}-${mo}-${d} ${h}:${mi}:${s}`;
+	return formatWithTimezone(dateInput, true);
 }
 
 // 统一格式为 YYYY-MM-DD HH:mm，支持站点时区
 export function formatDateTimeToYYYYMMDDHHmm(dateInput: Date | string): string {
-	// 优先从原始字符串提取UTC时间
-	if (typeof dateInput === "string") {
-		const zMatch = dateInput.match(
-			/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/,
-		);
-		if (zMatch) {
-			const [, y, mo, d, h, mi] = zMatch;
-			return `${y}-${mo}-${d} ${h}:${mi}`;
-		}
-		const plainMatch = dateInput.match(
-			/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/,
-		);
-		if (plainMatch) {
-			return `${plainMatch[1]}-${plainMatch[2]}-${plainMatch[3]} ${plainMatch[4]}:${plainMatch[5]}`;
-		}
-	}
-
-	// 回退：从Date对象取UTC分量
-	const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
-	const y = date.getUTCFullYear();
-	const mo = String(date.getUTCMonth() + 1).padStart(2, "0");
-	const d = String(date.getUTCDate()).padStart(2, "0");
-	const h = String(date.getUTCHours()).padStart(2, "0");
-	const mi = String(date.getUTCMinutes()).padStart(2, "0");
-
-	return `${y}-${mo}-${d} ${h}:${mi}`;
+	return formatWithTimezone(dateInput, false);
 }
