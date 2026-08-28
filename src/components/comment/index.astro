@@ -4,11 +4,7 @@ import { commentConfig } from "@/config/commentConfig";
 import Key from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
 import { removeFileExtension } from "@/utils/url-utils";
-import Artalk from "./Artalk.astro";
-import Disqus from "./Disqus.astro";
 import Giscus from "./Giscus.astro";
-import Twikoo from "./Twikoo.astro";
-import Waline from "./Waline.astro";
 
 interface Props {
 	post?: CollectionEntry<"posts"> | CollectionEntry<"spec">;
@@ -18,7 +14,6 @@ interface Props {
 
 const { post, customPath, title: customTitle } = Astro.props as Props;
 
-// 根据页面类型确定路径
 const slugFromPath = (customPath || "/").replace(/^\/+|\/+$/g, "") || "index";
 const slug = post ? removeFileExtension(post.id) : slugFromPath;
 const path = customPath
@@ -31,25 +26,12 @@ const path = customPath
 const url = `${Astro.site?.href}${path}`;
 const postTitle = post && "title" in post.data ? post.data.title : undefined;
 
-// 强制commentService类型为string，避免类型不兼容警告
-let commentService: string = commentConfig?.type || "none";
-
-// 双评论系统：同时支持 Twikoo 和 Giscus
-const dualMode = commentService === "twikoo" && commentConfig?.giscus;
+const commentService: string = commentConfig?.type || "none";
 ---
 
 {
   commentService !== "none" && (
     <div id="post-comments" class="card-base p-8 mb-6 relative overflow-hidden">
-      <!-- 评论区装饰性背景 -->
-      <div class="absolute top-0 right-0 w-32 h-32 opacity-5 pointer-events-none">
-        <svg viewBox="0 0 100 100" class="w-full h-full">
-          <circle cx="50" cy="50" r="40" fill="currentColor" class="text-(--primary)" />
-          <circle cx="50" cy="50" r="25" fill="none" stroke="currentColor" stroke-width="2" class="text-(--primary)" />
-          <circle cx="50" cy="50" r="10" fill="currentColor" class="text-(--primary)" />
-        </svg>
-      </div>
-      <!-- 评论区标题 -->
       <div class="relative z-10 mb-6">
         <div class="flex items-center gap-3 mb-2">
           <div class="w-1 h-6 bg-linear-to-b from-(--primary) to-transparent rounded-full"></div>
@@ -57,95 +39,9 @@ const dualMode = commentService === "twikoo" && commentConfig?.giscus;
         </div>
         <p class="text-sm text-(--content-meta) ml-4">{i18n(Key.commentSubtitle)}</p>
       </div>
-
-      <!-- 双评论切换按钮 -->
-      {dualMode && (
-        <div class="relative z-10 flex gap-3 mb-6" id="comment-tabs">
-          <button
-            id="tab-twikoo"
-            class="comment-tab active px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer"
-            onclick="switchComment('twikoo')"
-          >
-            <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-            </svg>
-            匿名评论
-          </button>
-          <button
-            id="tab-giscus"
-            class="comment-tab px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer"
-            onclick="switchComment('giscus')"
-          >
-            <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path>
-            </svg>
-            登录评论
-          </button>
-        </div>
-      )}
-
-      <!-- 评论内容区域 -->
       <div class="relative z-10 pl-2 pr-2">
-        {/* 双评论模式：同时加载两个，切换显示 */}
-        {dualMode && (
-          <>
-            <div id="comment-twikoo" class="comment-panel">
-              <Twikoo path={path} />
-            </div>
-            <div id="comment-giscus" class="comment-panel" style="display: none;">
-              <Giscus />
-            </div>
-          </>
-        )}
-
-        {/* 单评论模式 */}
-        {!dualMode && commentService === "twikoo" && <Twikoo path={path} />}
-        {!dualMode && commentService === "giscus" && <Giscus />}
-        {!dualMode && commentService === "waline" && <Waline path={path} />}
-        {!dualMode && commentService === "disqus" && <Disqus identifier={slug} url={url} title={customTitle || postTitle || slug} />}
-        {!dualMode && commentService === "artalk" && <Artalk path={path} />}
-
-        {commentService === "none" && (
-          <div class="text-center py-8 text-(--content-meta)">
-            <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-(--btn-regular-bg) flex items-center justify-center">
-              <svg class="w-8 h-8 text-(--primary)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-              </svg>
-            </div>
-            <p>{i18n(Key.commentNotConfigured)}</p>
-          </div>
-        )}
+        {commentService === "giscus" && <Giscus />}
       </div>
     </div>
   )
 }
-
-<style>
-  .comment-tab {
-    background: var(--btn-regular-bg);
-    color: var(--btn-content);
-    border: 2px solid transparent;
-  }
-  .comment-tab:hover {
-    opacity: 0.9;
-    transform: translateY(-1px);
-  }
-  .comment-tab.active {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
-    box-shadow: 0 2px 8px rgba(var(--primary-rgb), 0.3);
-  }
-</style>
-
-<script is:inline>
-function switchComment(type) {
-  // 切换面板显示
-  document.getElementById('comment-twikoo').style.display = type === 'twikoo' ? 'block' : 'none';
-  document.getElementById('comment-giscus').style.display = type === 'giscus' ? 'block' : 'none';
-
-  // 切换按钮状态
-  document.getElementById('tab-twikoo').classList.toggle('active', type === 'twikoo');
-  document.getElementById('tab-giscus').classList.toggle('active', type === 'giscus');
-}
-</script>
