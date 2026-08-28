@@ -4,15 +4,40 @@ const fs = require("fs");
 const path = require("path");
 const matter = require("gray-matter");
 const simpleGit = require("simple-git");
+const multer = require("multer");
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 const POSTS_DIR = path.join(PROJECT_ROOT, "src", "content", "posts");
+const IMAGES_DIR = path.join(PROJECT_ROOT, "src", "assets", "images");
 const git = simpleGit(PROJECT_ROOT);
 let currentBranch = "main";
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
+
+// ── Multer 配置：图片上传到 src/assets/images/ ──
+var storage = multer.diskStorage({
+  destination: function(req, file, cb) {
+    if (!fs.existsSync(IMAGES_DIR)) fs.mkdirSync(IMAGES_DIR, { recursive: true });
+    cb(null, IMAGES_DIR);
+  },
+  filename: function(req, file, cb) {
+    var ext = path.extname(file.originalname);
+    var base = path.basename(file.originalname, ext)
+      .toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff_-]/g, "-").replace(/-+/g, "-");
+    var name = base + "-" + Date.now() + ext;
+    cb(null, name);
+  }
+});
+var upload = multer({
+  storage: storage,
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: function(req, file, cb) {
+    var ok = /^image\/(jpeg|png|gif|webp|avif|svg\+xml)$/.test(file.mimetype);
+    cb(ok ? null : new Error("只允许上传图片文件"), ok);
+  }
+});
 
 const FM_DEFAULTS = {
   title: "", published: new Date().toISOString().slice(0, 10), draft: false,
@@ -63,7 +88,28 @@ const STYLE = [
   ".preview-panel code{background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:13px}",
   ".preview-panel pre{background:#1e293b;color:#e2e8f0;padding:16px;border-radius:6px;overflow-x:auto;margin-bottom:12px}",
   ".preview-panel pre code{background:none;padding:0;color:inherit}",
-  "@media(max-width:768px){.form-grid{grid-template-columns:1fr}.editor-layout{flex-direction:column}}"
+  ".cover-section{border:1px solid #e2e8f0;border-radius:8px;padding:16px;background:#fff}",
+  ".cover-row{display:flex;gap:16px;align-items:flex-start}",
+  ".cover-row .cover-input{flex:1}",
+  ".cover-row .cover-upload{flex:1}",
+  ".cover-preview{width:200px;height:120px;border-radius:6px;border:1px solid #e2e8f0;object-fit:cover;background:#f1f5f9;display:none}",
+  ".cover-preview.active{display:block}",
+  ".cover-actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}",
+  ".cover-gallery{display:flex;gap:8px;overflow-x:auto;padding:8px 0;max-width:100%}",
+  ".cover-gallery-item{width:100px;height:64px;border-radius:4px;border:2px solid transparent;object-fit:cover;cursor:pointer;flex-shrink:0;transition:border-color .15s}",
+  ".cover-gallery-item:hover{border-color:#94a3b8}",
+  ".cover-gallery-item.selected{border-color:#2563eb}",
+  ".upload-zone{border:2px dashed #e2e8f0;border-radius:8px;padding:24px;text-align:center;color:#94a3b8;cursor:pointer;transition:all .15s}",
+  ".upload-zone:hover{border-color:#2563eb;color:#2563eb}",
+  ".upload-zone.dragover{border-color:#2563eb;background:#eff6ff}",
+  ".upload-zone input{display:none}",
+  ".cover-tabs{display:flex;gap:0;margin-bottom:12px}",
+  ".cover-tab{padding:6px 14px;font-size:13px;border:1px solid #e2e8f0;cursor:pointer;background:#fafafa;color:#64748b;transition:all .15s}",
+  ".cover-tab:first-child{border-radius:6px 0 0 6px}",
+  ".cover-tab:last-child{border-radius:0 6px 6px 0}",
+  ".cover-tab.active{background:#2563eb;color:#fff;border-color:#2563eb}",
+  ".cover-tab-content{display:none}.cover-tab-content.active{display:block}",
+  "@media(max-width:768px){.form-grid{grid-template-columns:1fr}.editor-layout{flex-direction:column}.cover-row{flex-direction:column}.cover-preview{width:100%}}"
 ].join("\n");
 
 const TOAST_SCRIPT = [
@@ -119,6 +165,49 @@ function findPostFile(slug) {
   }
   return null;
 }
+
+/** 递归扫描图片目录，返回所有图片的相对路径 */
+function scanImages(dir, base) {
+  var results = [];
+  if (!fs.existsSync(dir)) return results;
+  var items = fs.readdirSync(dir, { withFileTypes: true });
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    var full = path.join(dir, item.name);
+    var rel = base ? base + "/" + item.name : item.name;
+    if (item.isDirectory()) {
+      results = results.concat(scanImages(full, rel));
+    } else if (/\.(jpe?g|png|gif|webp|avif|svg)$/i.test(item.name)) {
+      results.push(rel);
+    }
+  }
+  return results;
+}
+
+// ── API: 上传图片 ──
+app.post("/api/upload", function(req, res) {
+  upload.single("file")(req, res, function(err) {
+    if (err) {
+      return res.json({ ok: false, error: err.message || "上传失败" });
+    }
+    if (!req.file) {
+      return res.json({ ok: false, error: "未选择文件" });
+    }
+    var relPath = "src/assets/images/" + req.file.filename;
+    res.json({ ok: true, path: relPath, filename: req.file.filename, size: formatBytes(req.file.size) });
+  });
+});
+
+// ── API: 列出已有图片 ──
+app.get("/api/images", function(req, res) {
+  try {
+    var images = scanImages(IMAGES_DIR, "src/assets/images");
+    images.sort();
+    res.json({ ok: true, images: images });
+  } catch (e) {
+    res.json({ ok: false, error: e.message, images: [] });
+  }
+});
 
 // ── 列表页 ──
 app.get("/", function(req, res) {
@@ -188,8 +277,42 @@ function serveEditor(slug, res) {
   body += '<div class="form-group"><label>分类</label><input type="text" name="category" value="' + esc(data.category || "") + '" placeholder="如：技术、随笔"></div>';
   // 标签
   body += '<div class="form-group"><label>标签（逗号分隔）</label><input type="text" name="tags" value="' + esc((data.tags || []).join(", ")) + '" placeholder="前端, Astro, 教程"></div>';
-  // 图片
-  body += '<div class="form-group"><label>封面图片路径</label><input type="text" name="image" value="' + esc(data.image || "") + '" placeholder="./images/cover.avif"></div>';
+
+  // ── 封面图片区域 ──
+  body += '<div class="form-group full"><label>封面图片</label>';
+  body += '<div class="cover-section">';
+  // Tab 切换
+  body += '<div class="cover-tabs">';
+  body += '<div class="cover-tab active" onclick="switchCoverTab(0)">上传新图</div>';
+  body += '<div class="cover-tab" onclick="switchCoverTab(1)">从已有图片选择</div>';
+  body += '<div class="cover-tab" onclick="switchCoverTab(2)">手动输入路径</div>';
+  body += '</div>';
+  // Tab 0: 上传
+  body += '<div class="cover-tab-content active" id="coverTab0">';
+  body += '<div class="cover-row">';
+  body += '<div class="cover-upload"><div class="upload-zone" id="uploadZone" onclick="document.getElementById(\'fileInput\').click()">';
+  body += '<input type="file" id="fileInput" accept="image/*" multiple>';
+  body += '<div id="uploadHint">点击或拖拽图片到此处上传<br><span style="font-size:12px">支持 JPG / PNG / GIF / WebP / AVIF / SVG，最大 20MB</span></div>';
+  body += '</div></div>';
+  body += '<div><img class="cover-preview" id="coverPreview"></div>';
+  body += '</div></div>';
+  // Tab 1: 已有图片
+  body += '<div class="cover-tab-content" id="coverTab1">';
+  body += '<div class="cover-gallery" id="coverGallery"><span style="color:#94a3b8;font-size:13px">加载中...</span></div>';
+  body += '</div>';
+  // Tab 2: 手动输入
+  body += '<div class="cover-tab-content" id="coverTab2">';
+  body += '<input type="text" id="manualImageInput" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px" placeholder="./images/cover.avif 或 api 或留空">';
+  body += '<div class="help-text" style="margin-top:4px">留空 = 无封面 | 填 "api" = 随机图片 | 填路径 = 指定图片</div>';
+  body += '</div>';
+  // 隐藏的 image 字段 + 预览
+  body += '<input type="hidden" name="image" id="imageField" value="' + esc(data.image || "") + '">';
+  body += '<div style="margin-top:8px;display:flex;align-items:center;gap:12px">';
+  body += '<span class="help-text">当前值: <code id="imageCurrentValue">' + esc(data.image || "(空)") + '</code></span>';
+  body += '<img class="cover-preview' + (data.image ? " active" : "") + '" id="currentCover" style="width:80px;height:50px" src="' + (data.image ? esc(data.image) : "") + '">';
+  body += '</div>';
+  body += '</div></div>';
+
   // 作者
   body += '<div class="form-group"><label>作者</label><input type="text" name="author" value="' + esc(data.author || "") + '"></div>';
   // 语言
@@ -206,7 +329,7 @@ function serveEditor(slug, res) {
   body += '<div class="form-group"><label>授权链接</label><input type="text" name="licenseUrl" value="' + esc(data.licenseUrl || "") + '"></div>';
   // 密码
   body += '<div class="form-group"><label>密码保护</label><input type="text" name="password" value="' + esc(data.password || "") + '" placeholder="留空不加密"></div>';
-  body += '<div class="form-group"><label>密码提示</label><input type="text" name="passwordHint" value="' + esc(data.passwordHint || "") + '"></div>';
+  body += '<div class="form-group"><label>密码提示</label><input type="text" name="passwordHint" value="' + esc(data.passwordHint || "") + '""></div>';
 
   body += '</div>'; // form-grid
 
@@ -221,14 +344,46 @@ function serveEditor(slug, res) {
 
   // 脚本
   body += '<script>';
+  // 预览切换
   body += 'var pv=false;function togglePreview(){pv=!pv;document.getElementById("preview").style.display=pv?"block":"none";if(pv)updPreview()}';
   body += 'function updPreview(){var md=document.getElementById("editor").value;var h=md.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/^### (.+)$/gm,"<h3>$1</h3>").replace(/^## (.+)$/gm,"<h2>$1</h2>").replace(/^# (.+)$/gm,"<h1>$1</h1>").replace(/\\*\\*(.+?)\\*\\*/g,"<strong>$1</strong>").replace(/\\*(.+?)\\*/g,"<em>$1</em>").replace(/```([\\s\\S]*?)```/g,"<pre><code>$1</code></pre>").replace(/`(.+?)`/g,"<code>$1</code>").replace(/^- (.+)$/gm,"• $1").replace(/\\[(.+?)\\]\\((.+?)\\)/g,"<a href=\\"$2\\">$1</a>").replace(/\\n\\n/g,"</p><p>").replace(/\\n/g,"<br>");document.getElementById("preview").innerHTML="<p>"+h+"</p>"}';
   body += 'document.getElementById("editor").addEventListener("input",function(){if(pv)updPreview()})';
+  // Tab 切换
+  body += 'function switchCoverTab(idx){document.querySelectorAll(".cover-tab").forEach(function(t,i){t.classList.toggle("active",i===idx)});document.querySelectorAll(".cover-tab-content").forEach(function(c,i){c.classList.toggle("active",i===idx)});if(idx===1)loadGallery()}';
+  // 更新封面显示
+  body += 'function updateImageDisplay(val){document.getElementById("imageField").value=val;document.getElementById("imageCurrentValue").textContent=val||"(空)";var pv=document.getElementById("currentCover");if(val){pv.src=val;pv.classList.add("active")}else{pv.classList.remove("active")}}';
+  // 上传逻辑
+  body += 'var uz=document.getElementById("uploadZone"),fi=document.getElementById("fileInput");';
+  body += 'uz.addEventListener("dragover",function(e){e.preventDefault();uz.classList.add("dragover")});';
+  body += 'uz.addEventListener("dragleave",function(){uz.classList.remove("dragover")});';
+  body += 'uz.addEventListener("drop",function(e){e.preventDefault();uz.classList.remove("dragover");if(e.dataTransfer.files.length)uploadFiles(e.dataTransfer.files)});';
+  body += 'fi.addEventListener("change",function(){if(fi.files.length)uploadFiles(fi.files)});';
+  body += 'function uploadFiles(files){var file=files[0];var fd=new FormData();fd.append("file",file);document.getElementById("uploadHint").textContent="上传中...";fetch("/api/upload",{method:"POST",body:fd}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ 上传成功: "+j.filename,"success");updateImageDisplay(j.path);var pv=document.getElementById("coverPreview");pv.src="/api/upload-preview/"+j.filename;pv.classList.add("active");document.getElementById("uploadHint").textContent="点击或拖拽图片到此处上传\\n支持 JPG / PNG / GIF / WebP / AVIF / SVG，最大 20MB"}else{showToast("❌ "+(j.error||"上传失败"),"error");document.getElementById("uploadHint").textContent="点击或拖拽图片到此处上传"}}).catch(function(){showToast("❌ 网络错误","error");document.getElementById("uploadHint").textContent="点击或拖拽图片到此处上传"})}';
+  // 已有图片列表
+  body += 'function loadGallery(){fetch("/api/images").then(function(r){return r.json()}).then(function(j){var g=document.getElementById("coverGallery");if(!j.ok||!j.images.length){g.innerHTML="<span style=\\"color:#94a3b8;font-size:13px\\">暂无图片</span>";return}g.innerHTML="";j.images.forEach(function(img){var el=document.createElement("img");el.className="cover-gallery-item";el.src="/api/thumb/"+encodeURIComponent(img);el.title=img;el.onclick=function(){updateImageDisplay(img);showToast("✅ 已选择: "+img,"info",2000);document.querySelectorAll(".cover-gallery-item").forEach(function(x){x.classList.remove("selected")});el.classList.add("selected")};if(document.getElementById("imageField").value===img)el.classList.add("selected");g.appendChild(el)})}).catch(function(){document.getElementById("coverGallery").innerHTML="<span style=\\"color:#ef4444;font-size:13px\\">加载失败</span>")})';
+  // 手动输入同步
+  body += 'document.getElementById("manualImageInput").addEventListener("input",function(){updateImageDisplay(this.value)});';
+  body += 'document.getElementById("manualImageInput").value=document.getElementById("imageField").value;';
+  // 提交
   body += 'document.getElementById("postForm").addEventListener("submit",function(e){e.preventDefault();var btn=document.getElementById("saveBtn");setLoading(btn,true);var fd=new FormData(e.target);var b={title:fd.get("title"),slug:fd.get("slug"),published:fd.get("published"),tags:fd.get("tags"),category:fd.get("category"),description:fd.get("description"),image:fd.get("image"),author:fd.get("author"),lang:fd.get("lang"),draft:fd.has("draft"),pinned:fd.has("pinned"),comment:fd.has("comment"),sourceLink:fd.get("sourceLink"),licenseName:fd.get("licenseName"),licenseUrl:fd.get("licenseUrl"),password:fd.get("password"),passwordHint:fd.get("passwordHint"),content:fd.get("content")};fetch("/api/post",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ "+j.message,"success",4000);setTimeout(function(){location.href="/"},1500)}else{showToast("❌ "+(j.error||"保存失败"),"error",5000)}}).catch(function(){showToast("❌ 网络错误","error")});setLoading(btn,false)})';
   body += '</script>';
 
   res.send(wrapHTML(formTitle, body));
 }
+
+// ── API: 图片缩略图 ──
+app.get("/api/thumb/:filename", function(req, res) {
+  var filePath = path.join(IMAGES_DIR, req.params.filename);
+  if (!fs.existsSync(filePath)) return res.status(404).send("Not found");
+  res.sendFile(filePath);
+});
+
+// ── API: 上传预览（临时保存的文件直接返回） ──
+app.get("/api/upload-preview/:filename", function(req, res) {
+  var filePath = path.join(IMAGES_DIR, req.params.filename);
+  if (!fs.existsSync(filePath)) return res.status(404).send("Not found");
+  res.sendFile(filePath);
+});
 
 // ── API: 保存文章 ──
 app.post("/api/post", async function(req, res) {
@@ -315,6 +470,7 @@ async function start() {
     console.log("🚀 Aurora 后台已启动");
     console.log("   地址: http://localhost:" + PORT);
     console.log("   文章目录: " + POSTS_DIR);
+    console.log("   图片目录: " + IMAGES_DIR);
     console.log("");
   });
 }
