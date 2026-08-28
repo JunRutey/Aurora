@@ -762,7 +762,7 @@ app.post("/api/post", async function(req, res) {
 
     var fm = {
       title: title || slug,
-      published: published || new Date().toISOString().slice(0, 19).replace("T", " "),
+      published: published ? new Date(published.replace(" ", "T")) : new Date(),
       draft: body.draft || false,
       description: body.description || "",
       image: body.image || "",
