@@ -9,7 +9,7 @@
 ![Svelte](https://img.shields.io/badge/Svelte-5-red)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-**🌐 [在线访问](https://junrutey.github.io/Firefly/)**
+**🌐 [在线访问](https://junrutey.github.io/Aurora/)**
 
 </div>
 
