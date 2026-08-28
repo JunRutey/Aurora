@@ -141,19 +141,13 @@ const STYLE = [
   ".stat-row+.stat-row{border-top:1px solid #f8f9fa}",
   ".stat-label{color:#6b7280;display:flex;align-items:center;gap:6px}",
   ".stat-value{font-weight:600;color:#1f2937}",
-  // ── Header Stats Bar ──
-  ".header-stats{display:flex;gap:16px;margin-bottom:20px}",
-  ".header-stat-card{flex:1;background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px}",
-  ".header-stat-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center}",
-  ".header-stat-icon.blue{background:#eff6ff;color:#2563eb}",
-  ".header-stat-icon.green{background:#f0fdf4;color:#16a34a}",
-  ".header-stat-icon.amber{background:#fffbeb;color:#f59e0b}",
-  ".header-stat-icon.purple{background:#f5f3ff;color:#8b5cf6}",
-  ".header-stat-icon svg{width:18px;height:18px}",
-  ".header-stat-info{display:flex;flex-direction:column}",
-  ".header-stat-num{font-size:20px;font-weight:700;color:#111827;line-height:1.2}",
-  ".header-stat-text{font-size:12px;color:#6b7280}",
-  "@media(max-width:900px){.dashboard{flex-direction:column}.dashboard-side{width:100%}.header-stats{flex-wrap:wrap}.header-stat-card{min-width:calc(50% - 8px)}}",
+  // ── Stats Summary ──
+  ".stats-summary{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}",
+  ".stats-summary .stat-chip{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;background:#fff;border:1px solid #e8e8e8;border-radius:8px;font-size:13px;color:#6b7280;white-space:nowrap}",
+  ".stats-summary .stat-chip svg{width:15px;height:15px;opacity:.5;flex-shrink:0}",
+  ".stats-summary .stat-chip strong{color:#1f2937;font-weight:600}",
+  "@media(max-width:600px){.stats-summary .stat-chip{padding:8px 12px;font-size:12px;flex:1 1 calc(50% - 6px);justify-content:center}}",
+  "@media(max-width:900px){.dashboard{flex-direction:column}.dashboard-side{width:100%}}",
   // ── Modal ──
   ".modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.4);z-index:9998;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s}",
   ".modal-overlay.show{opacity:1}",
@@ -323,11 +317,12 @@ app.get("/", function(req, res) {
     body += '<h1 style="font-size:20px;font-weight:600;display:flex;align-items:center;gap:8px">' + icDash + ' Aurora<span style="color:#94a3b8;font-weight:400;font-size:14px;margin-left:4px">后台管理</span></h1>';
     body += '<div style="display:flex;gap:8px"><a href="/" class="btn btn-ghost btn-sm">' + icRefresh + ' 刷新</a><a href="/new" class="btn btn-primary">+ 新建文章</a></div>';
     body += '</header>';
-    body += '<div class="header-stats">';
-    body += '<div class="header-stat-card"><div class="header-stat-icon blue">' + icDoc + '</div><div class="header-stat-info"><span class="header-stat-num">' + totalPosts + '</span><span class="header-stat-text">篇文章</span></div></div>';
-    body += '<div class="header-stat-card"><div class="header-stat-icon green">' + icFolder + '</div><div class="header-stat-info"><span class="header-stat-num">' + catCount + '</span><span class="header-stat-text">个分类</span></div></div>';
-    body += '<div class="header-stat-card"><div class="header-stat-icon amber">' + icTag + '</div><div class="header-stat-info"><span class="header-stat-num">' + tagCount + '</span><span class="header-stat-text">个标签</span></div></div>';
-    body += '<div class="header-stat-card"><div class="header-stat-icon purple">' + icPin + '</div><div class="header-stat-info"><span class="header-stat-num">' + pinnedCount + '</span><span class="header-stat-text">篇置顶</span></div></div>';
+    body += '<div class="stats-summary">';
+    body += '<div class="stat-chip">' + icDoc + ' <strong>' + totalPosts + '</strong> 篇文章</div>';
+    body += '<div class="stat-chip">' + icFolder + ' <strong>' + catCount + '</strong> 个分类</div>';
+    body += '<div class="stat-chip">' + icTag + ' <strong>' + tagCount + '</strong> 个标签</div>';
+    body += '<div class="stat-chip">' + icPin + ' <strong>' + pinnedCount + '</strong> 篇置顶</div>';
+    if (stagedCount > 0) body += '<div class="stat-chip">' + icPackage + ' <strong>' + stagedCount + '</strong> 篇暂存</div>';
     body += '</div></div>';
 
     body += '<div class="dashboard">';
@@ -415,7 +410,7 @@ app.get("/staging", function(req, res) {
 
     body += '<script>';
     body += 'function pushOne(slug,btn){setLoading(btn,true);fetch("/api/staging/push-single",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({slugs:[slug]})}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast(j.message,"success");setTimeout(function(){location.reload()},800)}else{showToast(j.error||"推送失败","error");setLoading(btn,false)}}).catch(function(){showToast("网络错误","error");setLoading(btn,false)})}';
-    body += 'function removeStaged(slug){if(!confirm("从暂存列表移除 "+slug+" ?"))return;fetch("/api/staging/remove",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({slug:slug})}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("已移除","info");setTimeout(function(){location.reload()},500)}else{showToast(j.error||"操作失败","error")}}).catch(function(){showToast("网络错误","error")})}';
+    body += 'function removeStaged(slug){if(!confirm("从暂存列表移除 "+slug+" ?"))return;fetch("/api/staging/remove",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({slug:slug})}).then(function(r){return r.json()}).then(function(j){if(j.ok){location.reload()}else{showToast(j.error||"操作失败","error")}}).catch(function(){showToast("网络错误","error")})}';
     body += 'function batchPush(){if(!confirm("确认将所有暂存文章推送到仓库？"))return;var btn=document.querySelector(".btn-success");setLoading(btn,true);fetch("/api/staging/batch-push",{method:"POST"}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast(j.message,"success",4000);setTimeout(function(){location.reload()},1500)}else{showToast(j.error||"推送失败","error");setLoading(btn,false)}}).catch(function(){showToast("网络错误","error");setLoading(btn,false)})}';
     body += '</script>';
 
@@ -813,13 +808,21 @@ app.delete("/api/post/:slug", async function(req, res) {
     var filePath = findPostFile(slug);
     if (!filePath) return res.json({ ok: false, error: "文件不存在" });
 
+    var wasStaged = isStaged(slug);
+
     fs.unlinkSync(filePath);
     removeFromStaging(slug);
-    await git.add(".");
-    await git.commit("🗑️ 删除文章: " + slug);
-    await git.push("origin", currentBranch);
 
-    res.json({ ok: true, message: "文章「" + slug + "」已删除并推送" });
+    if (wasStaged) {
+      // 暂存中的文章 → 只删本地，不推送
+      res.json({ ok: true, message: "文章「" + slug + "」已删除（未推送，无需同步仓库）" });
+    } else {
+      // 已推送的文章 → 需要 commit + push 从仓库删除
+      await git.add(".");
+      await git.commit("🗑️ 删除文章: " + slug);
+      await git.push("origin", currentBranch);
+      res.json({ ok: true, message: "文章「" + slug + "」已从仓库删除并推送" });
+    }
   } catch (e) {
     console.error("Delete error:", e);
     res.json({ ok: false, error: e.message });
