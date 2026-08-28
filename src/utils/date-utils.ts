@@ -98,49 +98,61 @@ export function formatTimezoneOffset(
 
 // 统一格式为 YYYY-MM-DD HH:mm:ss，支持站点时区
 export function formatDateTimeWithSeconds(dateInput: Date | string): string {
-	const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
-
-	const options: Intl.DateTimeFormatOptions = {
-		year: "numeric",
-		month: "2-digit",
-		day: "2-digit",
-		hour: "2-digit",
-		minute: "2-digit",
-		second: "2-digit",
-		hour12: false,
-	};
-
-	if (siteConfig.timezone) {
-		options.timeZone = siteConfig.timezone;
+	// 优先从原始字符串提取UTC时间（避免Date对象在不同时区的解析差异）
+	if (typeof dateInput === "string") {
+		const zMatch = dateInput.match(
+			/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/,
+		);
+		if (zMatch) {
+			const [, y, mo, d, h, mi, s] = zMatch;
+			return `${y}-${mo}-${d} ${h}:${mi}:${s}`;
+		}
+		const plainMatch = dateInput.match(
+			/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/,
+		);
+		if (plainMatch) {
+			return dateInput;
+		}
 	}
 
-	const parts = new Intl.DateTimeFormat("en-CA", options).formatToParts(date);
-	const get = (type: Intl.DateTimeFormatPartTypes) =>
-		parts.find((p) => p.type === type)?.value || "";
+	// 回退：从Date对象取UTC分量
+	const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+	const y = date.getUTCFullYear();
+	const mo = String(date.getUTCMonth() + 1).padStart(2, "0");
+	const d = String(date.getUTCDate()).padStart(2, "0");
+	const h = String(date.getUTCHours()).padStart(2, "0");
+	const mi = String(date.getUTCMinutes()).padStart(2, "0");
+	const s = String(date.getUTCSeconds()).padStart(2, "0");
 
-	return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}:${get("second")}`;
+	return `${y}-${mo}-${d} ${h}:${mi}:${s}`;
 }
 
 // 统一格式为 YYYY-MM-DD HH:mm，支持站点时区
 export function formatDateTimeToYYYYMMDDHHmm(dateInput: Date | string): string {
-	const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
-
-	const options: Intl.DateTimeFormatOptions = {
-		year: "numeric",
-		month: "2-digit",
-		day: "2-digit",
-		hour: "2-digit",
-		minute: "2-digit",
-		hour12: false,
-	};
-
-	if (siteConfig.timezone) {
-		options.timeZone = siteConfig.timezone;
+	// 优先从原始字符串提取UTC时间
+	if (typeof dateInput === "string") {
+		const zMatch = dateInput.match(
+			/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/,
+		);
+		if (zMatch) {
+			const [, y, mo, d, h, mi] = zMatch;
+			return `${y}-${mo}-${d} ${h}:${mi}`;
+		}
+		const plainMatch = dateInput.match(
+			/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/,
+		);
+		if (plainMatch) {
+			return `${plainMatch[1]}-${plainMatch[2]}-${plainMatch[3]} ${plainMatch[4]}:${plainMatch[5]}`;
+		}
 	}
 
-	const parts = new Intl.DateTimeFormat("en-CA", options).formatToParts(date);
-	const get = (type: Intl.DateTimeFormatPartTypes) =>
-		parts.find((p) => p.type === type)?.value || "";
+	// 回退：从Date对象取UTC分量
+	const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+	const y = date.getUTCFullYear();
+	const mo = String(date.getUTCMonth() + 1).padStart(2, "0");
+	const d = String(date.getUTCDate()).padStart(2, "0");
+	const h = String(date.getUTCHours()).padStart(2, "0");
+	const mi = String(date.getUTCMinutes()).padStart(2, "0");
 
-	return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
+	return `${y}-${mo}-${d} ${h}:${mi}`;
 }

@@ -189,8 +189,12 @@ function formatBytes(b) {
 function serializeFM(data) {
   var out = {};
   for (var k in data) {
-    if (data[k] instanceof Date) out[k] = data[k].toISOString();
-    else out[k] = data[k];
+    if (data[k] instanceof Date) {
+      // 带Z后缀，确保前端能正确识别UTC时间
+      out[k] = data[k].toISOString();
+    } else {
+      out[k] = data[k];
+    }
   }
   return out;
 }
