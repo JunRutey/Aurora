@@ -9,6 +9,7 @@ const multer = require("multer");
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 const POSTS_DIR = path.join(PROJECT_ROOT, "src", "content", "posts");
 const IMAGES_DIR = path.join(PROJECT_ROOT, "src", "assets", "images");
+const STAGING_FILE = path.join(__dirname, ".staging.json");
 const git = simpleGit(PROJECT_ROOT);
 let currentBranch = "main";
 
@@ -16,7 +17,7 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 
-// ── Multer 配置：图片上传到 src/assets/images/ ──
+// ── Multer 配置 ──
 var storage = multer.diskStorage({
   destination: function(req, file, cb) {
     if (!fs.existsSync(IMAGES_DIR)) fs.mkdirSync(IMAGES_DIR, { recursive: true });
@@ -26,36 +27,58 @@ var storage = multer.diskStorage({
     var ext = path.extname(file.originalname);
     var base = path.basename(file.originalname, ext)
       .toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff_-]/g, "-").replace(/-+/g, "-");
-    var name = base + "-" + Date.now() + ext;
-    cb(null, name);
+    cb(null, base + "-" + Date.now() + ext);
   }
 });
 var upload = multer({
   storage: storage,
   limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: function(req, file, cb) {
-    var ok = /^image\/(jpeg|png|gif|webp|avif|svg\+xml)$/.test(file.mimetype);
-    cb(ok ? null : new Error("只允许上传图片文件"), ok);
+    cb(/^image\/(jpeg|png|gif|webp|avif|svg\+xml)$/.test(file.mimetype) ? null : new Error("只允许上传图片文件"), true);
   }
 });
 
 const FM_DEFAULTS = {
-  title: "", published: new Date().toISOString().slice(0, 10), draft: false,
+  title: "", published: new Date().toISOString().slice(0, 19).replace("T", " "), draft: false,
   description: "", image: "", tags: [], category: "", lang: "", pinned: false,
   author: "", sourceLink: "", licenseName: "", licenseUrl: "", comment: true,
   password: "", passwordHint: "",
 };
 
+// ── 暂存管理 ──
+function loadStaging() {
+  try { return JSON.parse(fs.readFileSync(STAGING_FILE, "utf-8")); }
+  catch (e) { return []; }
+}
+function saveStaging(list) {
+  fs.writeFileSync(STAGING_FILE, JSON.stringify(list, null, 2), "utf-8");
+}
+function addToStaging(slug, title) {
+  var list = loadStaging();
+  if (!list.find(function(s) { return s.slug === slug; })) {
+    list.push({ slug: slug, title: title || slug, stagedAt: new Date().toISOString() });
+    saveStaging(list);
+  }
+  return list;
+}
+function removeFromStaging(slug) {
+  var list = loadStaging().filter(function(s) { return s.slug !== slug; });
+  saveStaging(list);
+  return list;
+}
+
 // ── HTML helpers ──
 const STYLE = [
   "*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}",
-  "body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans SC',sans-serif;background:#fafafa;color:#1a1a1a;line-height:1.6}",
+  "body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans SC',sans-serif;background:#f5f5f5;color:#1a1a1a;line-height:1.6}",
   "a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}",
   ".container{max-width:960px;margin:0 auto;padding:24px 20px}",
   "header{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px}",
   "header h1{font-size:20px;font-weight:600}header h1 span{color:#94a3b8;font-weight:400;font-size:14px;margin-left:8px}",
   ".btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:6px;border:none;font-size:14px;font-weight:500;cursor:pointer;transition:all .15s}",
   ".btn-primary{background:#2563eb;color:#fff}.btn-primary:hover{background:#1d4ed8}",
+  ".btn-success{background:#16a34a;color:#fff}.btn-success:hover{background:#15803d}",
+  ".btn-warning{background:#f59e0b;color:#fff}.btn-warning:hover{background:#d97706}",
   ".btn-danger{background:#ef4444;color:#fff}.btn-danger:hover{background:#dc2626}",
   ".btn-ghost{background:transparent;color:#64748b;border:1px solid #e2e8f0}.btn-ghost:hover{background:#f1f5f9}",
   ".btn-sm{padding:4px 10px;font-size:12px}",
@@ -83,11 +106,6 @@ const STYLE = [
   ".editor-layout{display:flex;gap:16px}",
   ".editor-layout .form-group.editor{flex:1}",
   ".editor-layout .preview-panel{flex:1;border:1px solid #e2e8f0;border-radius:6px;padding:16px;overflow-y:auto;max-height:500px;background:#fff;font-size:14px;line-height:1.8}",
-  ".preview-panel h1,.preview-panel h2,.preview-panel h3{margin:16px 0 8px}",
-  ".preview-panel p{margin-bottom:12px}",
-  ".preview-panel code{background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:13px}",
-  ".preview-panel pre{background:#1e293b;color:#e2e8f0;padding:16px;border-radius:6px;overflow-x:auto;margin-bottom:12px}",
-  ".preview-panel pre code{background:none;padding:0;color:inherit}",
   ".cover-section{border:1px solid #e2e8f0;border-radius:8px;padding:16px;background:#fff}",
   ".cover-row{display:flex;gap:16px;align-items:flex-start}",
   ".cover-row .cover-upload{flex:1}",
@@ -107,7 +125,45 @@ const STYLE = [
   ".cover-tab:last-child{border-radius:0 6px 6px 0}",
   ".cover-tab.active{background:#2563eb;color:#fff;border-color:#2563eb}",
   ".cover-tab-content{display:none}.cover-tab-content.active{display:block}",
-  "@media(max-width:768px){.form-grid{grid-template-columns:1fr}.editor-layout{flex-direction:column}.cover-row{flex-direction:column}.cover-preview{width:100%}}"
+  "@media(max-width:768px){.form-grid{grid-template-columns:1fr}.editor-layout{flex-direction:column}.cover-row{flex-direction:column}.cover-preview{width:100%}}",
+  // ── Dashboard Layout ──
+  ".dashboard{display:flex;gap:20px;max-width:1100px;margin:0 auto;padding:24px 20px}",
+  ".dashboard-main{flex:1;min-width:0}",
+  ".dashboard-side{width:280px;flex-shrink:0;display:flex;flex-direction:column;gap:16px}",
+  ".widget{background:#fff;border-radius:10px;border:1px solid #e8e8e8;overflow:hidden}",
+  ".widget-header{padding:14px 16px 10px;font-size:13px;font-weight:600;color:#374151;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between}",
+  ".widget-body{padding:12px 16px 16px}",
+  ".widget-link{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;font-size:13px;color:#475569;transition:all .15s;text-decoration:none}",
+  ".widget-link:hover{background:#f8fafc;color:#2563eb;text-decoration:none}",
+  ".widget-link svg{width:16px;height:16px;opacity:.45;flex-shrink:0}",
+  // ── Stats ──
+  ".stat-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;font-size:13px}",
+  ".stat-row+.stat-row{border-top:1px solid #f8f9fa}",
+  ".stat-label{color:#6b7280;display:flex;align-items:center;gap:6px}",
+  ".stat-value{font-weight:600;color:#1f2937}",
+  // ── Header Stats Bar ──
+  ".header-stats{display:flex;gap:16px;margin-bottom:20px}",
+  ".header-stat-card{flex:1;background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px}",
+  ".header-stat-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center}",
+  ".header-stat-icon.blue{background:#eff6ff;color:#2563eb}",
+  ".header-stat-icon.green{background:#f0fdf4;color:#16a34a}",
+  ".header-stat-icon.amber{background:#fffbeb;color:#f59e0b}",
+  ".header-stat-icon.purple{background:#f5f3ff;color:#8b5cf6}",
+  ".header-stat-icon svg{width:18px;height:18px}",
+  ".header-stat-info{display:flex;flex-direction:column}",
+  ".header-stat-num{font-size:20px;font-weight:700;color:#111827;line-height:1.2}",
+  ".header-stat-text{font-size:12px;color:#6b7280}",
+  "@media(max-width:900px){.dashboard{flex-direction:column}.dashboard-side{width:100%}.header-stats{flex-wrap:wrap}.header-stat-card{min-width:calc(50% - 8px)}}",
+  // ── Modal ──
+  ".modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.4);z-index:9998;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s}",
+  ".modal-overlay.show{opacity:1}",
+  ".modal{background:#fff;border-radius:12px;padding:28px 28px 24px;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);transform:translateY(20px);transition:transform .2s}",
+  ".modal-overlay.show .modal{transform:translateY(0)}",
+  ".modal h2{font-size:18px;font-weight:600;margin-bottom:6px}",
+  ".modal p{font-size:14px;color:#64748b;margin-bottom:20px}",
+  ".modal-actions{display:flex;gap:10px;justify-content:flex-end}",
+  // ── Staging Badge ──
+  ".staged-badge{display:inline-block;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#92400e;font-size:11px;font-weight:500;margin-left:6px}"
 ].join("\n");
 
 const TOAST_SCRIPT = [
@@ -133,7 +189,7 @@ function formatBytes(b) {
 function serializeFM(data) {
   var out = {};
   for (var k in data) {
-    if (data[k] instanceof Date) out[k] = data[k].toISOString().slice(0, 10);
+    if (data[k] instanceof Date) out[k] = data[k].toISOString().slice(0, 19).replace("T", " ");
     else out[k] = data[k];
   }
   return out;
@@ -164,7 +220,6 @@ function findPostFile(slug) {
   return null;
 }
 
-/** 递归扫描图片目录，返回所有图片的相对路径 */
 function scanImages(dir, base) {
   var results = [];
   if (!fs.existsSync(dir)) return results;
@@ -182,66 +237,189 @@ function scanImages(dir, base) {
   return results;
 }
 
+function isStaged(slug) {
+  return loadStaging().some(function(s) { return s.slug === slug; });
+}
+
+// ── SVG Icons ──
+var icDoc = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>';
+var icFolder = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
+var icTag = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>';
+var icPin = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>';
+var icEdit = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+var icDash = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>';
+var icPackage = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16.5 9.4l-9-5.19M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>';
+var icInbox = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg>';
+var icRefresh = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>';
+
 // ── API: 上传图片 ──
 app.post("/api/upload", function(req, res) {
   upload.single("file")(req, res, function(err) {
-    if (err) {
-      return res.json({ ok: false, error: err.message || "上传失败" });
-    }
-    if (!req.file) {
-      return res.json({ ok: false, error: "未选择文件" });
-    }
-    var relPath = "src/assets/images/" + req.file.filename;
-    res.json({ ok: true, path: relPath, filename: req.file.filename, size: formatBytes(req.file.size) });
+    if (err) return res.json({ ok: false, error: err.message || "上传失败" });
+    if (!req.file) return res.json({ ok: false, error: "未选择文件" });
+    res.json({ ok: true, path: "src/assets/images/" + req.file.filename, filename: req.file.filename, size: formatBytes(req.file.size) });
   });
 });
 
-// ── API: 列出已有图片 ──
+// ── API: 文章元数据 ──
+app.get("/api/post-meta.json", function(req, res) {
+  try {
+    res.json(getAllPosts().map(function(p) {
+      return { id: p.slug, title: p.data.title || p.slug, published: p.data.published || "", draft: !!p.data.draft, pinned: !!p.data.pinned };
+    }));
+  } catch(e) { res.json([]); }
+});
+
+// ── API: 已有图片 ──
 app.get("/api/images", function(req, res) {
   try {
     var images = scanImages(IMAGES_DIR, "src/assets/images");
     images.sort();
     res.json({ ok: true, images: images });
-  } catch (e) {
-    res.json({ ok: false, error: e.message, images: [] });
-  }
+  } catch (e) { res.json({ ok: false, error: e.message, images: [] }); }
 });
 
-// ── API: 图片缩略图（统一入口，支持路径中的子目录） ──
+// ── API: 图片缩略图 ──
 app.get("/api/thumb/*", function(req, res) {
-  // req.params[0] 是通配符匹配到的路径，如 "src/assets/images/xxx.jpg"
-  var relPath = req.params[0] || req.params.filename || "";
-  // 安全检查：防止路径穿越
+  var relPath = req.params[0] || "";
   if (relPath.includes("..")) return res.status(403).send("Forbidden");
   var filePath = path.join(PROJECT_ROOT, relPath);
   if (!fs.existsSync(filePath)) return res.status(404).send("Not found");
   res.sendFile(filePath);
 });
 
-// ── 列表页 ──
+// ── Dashboard 列表页 ──
 app.get("/", function(req, res) {
   try {
     var posts = getAllPosts();
     posts.sort(function(a, b) { return new Date(b.data.published) - new Date(a.data.published); });
+
+    var totalPosts = posts.length;
+    var draftCount = posts.filter(function(p) { return p.data.draft; }).length;
+    var pinnedCount = posts.filter(function(p) { return p.data.pinned; }).length;
+    var allTags = {};
+    posts.forEach(function(p) { (p.data.tags || []).forEach(function(t) { allTags[t] = 1; }); });
+    var tagCount = Object.keys(allTags).length;
+    var cats = {};
+    posts.forEach(function(p) { if (p.data.category) cats[p.data.category] = 1; });
+    var catCount = Object.keys(cats).length;
+    var stagedCount = loadStaging().length;
+
+    // ── 表格行 ──
     var rows = posts.map(function(p) {
       var tags = (p.data.tags || []).map(function(t) { return '<span class="tag">' + esc(t) + '</span>'; }).join("");
       var badges = [];
       if (p.data.draft) badges.push('<span class="draft-badge">草稿</span>');
       if (p.data.pinned) badges.push('<span class="pinned-badge">置顶</span>');
-      var date = p.data.published ? new Date(p.data.published).toLocaleDateString("zh-CN") : "-";
+      if (isStaged(p.slug)) badges.push('<span class="staged-badge">已暂存</span>');
+      var date = p.data.published ? new Date(String(p.data.published).replace(" ", "T")).toLocaleString("zh-CN", { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false }) : "-";
       return '<tr><td><a href="/edit?slug=' + encodeURIComponent(p.slug) + '">' + esc(p.data.title || p.slug) + '</a> ' + badges.join(" ") + '</td><td>' + date + '</td><td>' + (tags || '<span style="color:#cbd5e1">-</span>') + '</td><td>' + p.size + '</td><td class="actions"><a href="/edit?slug=' + encodeURIComponent(p.slug) + '" class="btn btn-ghost btn-sm">编辑</a><button class="btn btn-danger btn-sm" onclick="deletePost(\'' + esc(p.slug) + '\')">删除</button></td></tr>';
     }).join("\n");
 
-    var body = '<div class="container"><header><h1>Aurora<span>后台管理</span></h1><a href="/new" class="btn btn-primary">+ 新建文章</a></header>';
+    // ── Dashboard ──
+    var body = '';
+    body += '<div style="max-width:1100px;margin:0 auto;padding:24px 20px 0">';
+    body += '<header style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">';
+    body += '<h1 style="font-size:20px;font-weight:600;display:flex;align-items:center;gap:8px">' + icDash + ' Aurora<span style="color:#94a3b8;font-weight:400;font-size:14px;margin-left:4px">后台管理</span></h1>';
+    body += '<div style="display:flex;gap:8px"><a href="/" class="btn btn-ghost btn-sm">' + icRefresh + ' 刷新</a><a href="/new" class="btn btn-primary">+ 新建文章</a></div>';
+    body += '</header>';
+    body += '<div class="header-stats">';
+    body += '<div class="header-stat-card"><div class="header-stat-icon blue">' + icDoc + '</div><div class="header-stat-info"><span class="header-stat-num">' + totalPosts + '</span><span class="header-stat-text">篇文章</span></div></div>';
+    body += '<div class="header-stat-card"><div class="header-stat-icon green">' + icFolder + '</div><div class="header-stat-info"><span class="header-stat-num">' + catCount + '</span><span class="header-stat-text">个分类</span></div></div>';
+    body += '<div class="header-stat-card"><div class="header-stat-icon amber">' + icTag + '</div><div class="header-stat-info"><span class="header-stat-num">' + tagCount + '</span><span class="header-stat-text">个标签</span></div></div>';
+    body += '<div class="header-stat-card"><div class="header-stat-icon purple">' + icPin + '</div><div class="header-stat-info"><span class="header-stat-num">' + pinnedCount + '</span><span class="header-stat-text">篇置顶</span></div></div>';
+    body += '</div></div>';
+
+    body += '<div class="dashboard">';
+
+    // ── Main ──
+    body += '<div class="dashboard-main">';
     if (posts.length === 0) {
-      body += '<div class="empty"><p>还没有文章</p><a href="/new" class="btn btn-primary">写第一篇</a></div>';
+      body += '<div class="empty" style="background:#fff;border-radius:10px;border:1px solid #e8e8e8"><p>还没有文章</p><a href="/new" class="btn btn-primary">写第一篇</a></div>';
     } else {
+      body += '<div style="background:#fff;border-radius:10px;border:1px solid #e8e8e8;overflow:hidden">';
       body += '<table class="post-table"><thead><tr><th>标题</th><th>日期</th><th>标签</th><th>大小</th><th>操作</th></tr></thead><tbody>' + rows + '</tbody></table>';
+      body += '</div>';
     }
     body += '</div>';
-    body += '<script>function deletePost(slug){if(!confirm("确定删除 "+slug+" ?"))return;var btn=event.target;setLoading(btn,true);fetch("/api/post/"+encodeURIComponent(slug),{method:"DELETE"}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ "+j.message,"success");setTimeout(function(){location.reload()},800)}else{showToast("❌ "+(j.error||"删除失败"),"error")}}).catch(function(){showToast("❌ 网络错误","error")});setLoading(btn,false)}</script>';
+
+    // ── Sidebar ──
+    body += '<div class="dashboard-side">';
+    body += '<div class="widget"><div class="widget-header">快捷操作</div><div class="widget-body">';
+    body += '<a href="/new" class="widget-link">' + icEdit + ' 新建文章</a>';
+    body += '<a href="/" class="widget-link">' + icRefresh + ' 刷新列表</a>';
+    body += '<a href="/staging" class="widget-link">' + icInbox + ' 暂存列表' + (stagedCount > 0 ? ' <span style="background:#f59e0b;color:#fff;font-size:11px;padding:1px 6px;border-radius:8px;margin-left:auto">' + stagedCount + '</span>' : '') + '</a>';
+    body += '</div></div>';
+
+    // ── 暂存概览 widget ──
+    var stagingList = loadStaging();
+    if (stagingList.length > 0) {
+      body += '<div class="widget"><div class="widget-header">' + icPackage + ' 待推送 <span style="color:#94a3b8;font-size:11px">' + stagingList.length + ' 篇</span></div><div class="widget-body">';
+      stagingList.slice(0, 5).forEach(function(s) {
+        body += '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;font-size:13px;color:#475569;border-bottom:1px solid #f8f9fa">';
+        body += '<a href="/edit?slug=' + encodeURIComponent(s.slug) + '" style="color:inherit;text-decoration:none">' + esc(s.title || s.slug) + '</a>';
+        body += '<span style="color:#94a3b8;font-size:11px">' + (s.stagedAt ? new Date(s.stagedAt).toLocaleDateString("zh-CN") : "") + '</span>';
+        body += '</div>';
+      });
+      if (stagingList.length > 5) body += '<div style="text-align:center;padding:8px 0"><a href="/staging" style="font-size:12px">查看全部</a></div>';
+      body += '</div></div>';
+    }
+    body += '</div></div>';
+
+    body += '<script>function deletePost(slug){if(!confirm("确定删除 "+slug+" ?"))return;var btn=event.target;setLoading(btn,true);fetch("/api/post/"+encodeURIComponent(slug),{method:"DELETE"}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast(j.message,"success");setTimeout(function(){location.reload()},800)}else{showToast(j.error||"删除失败","error")}}).catch(function(){showToast("网络错误","error")});setLoading(btn,false)}</script>';
 
     res.send(wrapHTML("文章列表", body));
+  } catch (e) {
+    res.status(500).send(wrapHTML("错误", '<div class="container"><h1>错误</h1><pre>' + esc(e.message) + '</pre></div>'));
+  }
+});
+
+// ── 暂存列表页 ──
+app.get("/staging", function(req, res) {
+  try {
+    var stagingList = loadStaging();
+    var allPosts = getAllPosts();
+
+    var body = '<div class="container">';
+    body += '<header><h1>' + icInbox + ' 暂存列表<span style="color:#94a3b8;font-weight:400;font-size:14px;margin-left:8px">' + stagingList.length + ' 篇待推送</span></h1>';
+    body += '<div style="display:flex;gap:8px"><a href="/" class="btn btn-ghost">← 返回列表</a>';
+    if (stagingList.length > 0) {
+      body += '<button class="btn btn-success" onclick="batchPush()">' + icPackage + ' 全部推送到仓库</button>';
+    }
+    body += '</div></header>';
+
+    if (stagingList.length === 0) {
+      body += '<div class="empty" style="background:#fff;border-radius:10px;border:1px solid #e8e8e8;padding:60px 20px">';
+      body += '<p style="color:#94a3b8">暂存列表为空</p>';
+      body += '<a href="/new" class="btn btn-primary">新建文章</a>';
+      body += '</div>';
+    } else {
+      body += '<div style="background:#fff;border-radius:10px;border:1px solid #e8e8e8;overflow:hidden">';
+      body += '<table class="post-table"><thead><tr><th>标题</th><th>暂存时间</th><th>操作</th></tr></thead><tbody>';
+      stagingList.forEach(function(s) {
+        var post = allPosts.find(function(p) { return p.slug === s.slug; });
+        var date = s.stagedAt ? new Date(s.stagedAt).toLocaleString("zh-CN", { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", hour12:false }) : "-";
+        body += '<tr>';
+        body += '<td><a href="/edit?slug=' + encodeURIComponent(s.slug) + '">' + esc(post ? (post.data.title || s.slug) : s.title || s.slug) + '</a></td>';
+        body += '<td>' + date + '</td>';
+        body += '<td class="actions">';
+        body += '<a href="/edit?slug=' + encodeURIComponent(s.slug) + '" class="btn btn-ghost btn-sm">编辑</a>';
+        body += '<button class="btn btn-ghost btn-sm" onclick="pushOne(\'' + esc(s.slug) + '\',this)">推送</button>';
+        body += '<button class="btn btn-danger btn-sm" onclick="removeStaged(\'' + esc(s.slug) + '\')">移除</button>';
+        body += '</td></tr>';
+      });
+      body += '</tbody></table>';
+      body += '</div>';
+    }
+    body += '</div>';
+
+    body += '<script>';
+    body += 'function pushOne(slug,btn){setLoading(btn,true);fetch("/api/staging/push-single",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({slugs:[slug]})}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast(j.message,"success");setTimeout(function(){location.reload()},800)}else{showToast(j.error||"推送失败","error");setLoading(btn,false)}}).catch(function(){showToast("网络错误","error");setLoading(btn,false)})}';
+    body += 'function removeStaged(slug){if(!confirm("从暂存列表移除 "+slug+" ?"))return;fetch("/api/staging/remove",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({slug:slug})}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("已移除","info");setTimeout(function(){location.reload()},500)}else{showToast(j.error||"操作失败","error")}}).catch(function(){showToast("网络错误","error")})}';
+    body += 'function batchPush(){if(!confirm("确认将所有暂存文章推送到仓库？"))return;var btn=document.querySelector(".btn-success");setLoading(btn,true);fetch("/api/staging/batch-push",{method:"POST"}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast(j.message,"success",4000);setTimeout(function(){location.reload()},1500)}else{showToast(j.error||"推送失败","error");setLoading(btn,false)}}).catch(function(){showToast("网络错误","error");setLoading(btn,false)})}';
+    body += '</script>';
+
+    res.send(wrapHTML("暂存列表", body));
   } catch (e) {
     res.status(500).send(wrapHTML("错误", '<div class="container"><h1>错误</h1><pre>' + esc(e.message) + '</pre></div>'));
   }
@@ -272,6 +450,7 @@ function serveEditor(slug, res) {
   }
 
   var formTitle = isNew ? "新建文章" : "编辑: " + (data.title || slug);
+  var staged = isStaged(slug);
 
   var body = '<div class="container"><header><h1>' + esc(formTitle) + '</h1><a href="/" class="btn btn-ghost">← 返回列表</a></header>';
   body += '<form id="postForm"><div class="form-grid">';
@@ -281,16 +460,19 @@ function serveEditor(slug, res) {
   // Slug
   body += '<div class="form-group"><label>Slug（文件名）</label><input type="text" name="slug" value="' + esc(slug || "") + '" placeholder="留空自动生成"' + (slug ? ' readonly style="background:#f1f5f9"' : '') + '><span class="help-text">作为 .md 文件名，如 my-post</span></div>';
   // 日期
-  body += '<div class="form-group"><label>发布日期 *</label><input type="date" name="published" value="' + esc(data.published ? String(data.published).slice(0, 10) : new Date().toISOString().slice(0, 10)) + '"></div>';
-  // 分类
+  var defaultDate = data.published ? String(data.published).slice(0, 10) : new Date().toISOString().slice(0, 10);
+  body += '<div class="form-group"><label>发布日期 *</label><input type="date" name="publishedDate" value="' + esc(defaultDate) + '"></div>';
+  body += '<div class="form-group"><label>发布时间（系统同步）</label><div style="display:flex;align-items:center;gap:6px;padding:8px 0">';
+  body += '<span id="sysTime" style="font-size:20px;font-weight:600;font-family:\'JetBrains Mono\',monospace;color:#1a1a1a;letter-spacing:1px">--:--:--</span>';
+  body += '<span style="color:#94a3b8;font-size:12px;margin-left:4px">⏱ 实时同步系统时钟</span>';
+  body += '</div></div>';
+  // 分类 / 标签
   body += '<div class="form-group"><label>分类</label><input type="text" name="category" value="' + esc(data.category || "") + '" placeholder="如：技术、随笔"></div>';
-  // 标签
   body += '<div class="form-group"><label>标签（逗号分隔）</label><input type="text" name="tags" value="' + esc((data.tags || []).join(", ")) + '" placeholder="前端, Astro, 教程"></div>';
 
   // ── 封面图片区域 ──
   body += '<div class="form-group full"><label>封面图片</label>';
   body += '<div class="cover-section">';
-  // Tab 切换
   body += '<div class="cover-tabs">';
   body += '<div class="cover-tab active" onclick="switchCoverTab(0)">上传新图</div>';
   body += '<div class="cover-tab" onclick="switchCoverTab(1)">从已有图片选择</div>';
@@ -305,42 +487,35 @@ function serveEditor(slug, res) {
   body += '</div></div>';
   body += '<div><img class="cover-preview" id="coverPreview"></div>';
   body += '</div></div>';
-  // Tab 1: 已有图片
+  // Tab 1
   body += '<div class="cover-tab-content" id="coverTab1">';
   body += '<div class="cover-gallery" id="coverGallery"><span style="color:#94a3b8;font-size:13px">加载中...</span></div>';
   body += '</div>';
-  // Tab 2: 手动输入
+  // Tab 2
   body += '<div class="cover-tab-content" id="coverTab2">';
   body += '<input type="text" id="manualImageInput" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px" placeholder="./images/cover.avif 或 api 或留空">';
   body += '<div class="help-text" style="margin-top:4px">留空 = 无封面 | 填 "api" = 随机图片 | 填路径 = 指定图片</div>';
   body += '</div>';
-  // 隐藏的 image 字段 + 预览
+  // 隐藏字段 + 预览
   body += '<input type="hidden" name="image" id="imageField" value="' + esc(data.image || "") + '">';
   body += '<div style="margin-top:8px;display:flex;align-items:center;gap:12px">';
   body += '<span class="help-text">当前值: <code id="imageCurrentValue">' + esc(data.image || "(空)") + '</code></span>';
   var thumbSrc = data.image ? "/api/thumb/" + encodeURIComponent(data.image) : "";
   body += '<img class="cover-preview' + (data.image ? " active" : "") + '" id="currentCover" style="width:80px;height:50px" src="' + esc(thumbSrc) + '">';
-  body += '</div>';
-  body += '</div></div>';
+  body += '</div></div></div>';
 
-  // 作者
+  // 其他字段
   body += '<div class="form-group"><label>作者</label><input type="text" name="author" value="' + esc(data.author || "") + '"></div>';
-  // 语言
   body += '<div class="form-group"><label>语言</label><input type="text" name="lang" value="' + esc(data.lang || "") + '" placeholder="留空默认中文"></div>';
-  // 描述
   body += '<div class="form-group full"><label>描述</label><input type="text" name="description" value="' + esc(data.description || "") + '" placeholder="文章摘要，用于 SEO 和列表展示"></div>';
-  // 复选框
   body += '<div class="form-group"><label><input type="checkbox" name="draft"' + (data.draft ? " checked" : "") + '> 草稿（不发布）</label></div>';
   body += '<div class="form-group"><label><input type="checkbox" name="pinned"' + (data.pinned ? " checked" : "") + '> 置顶</label></div>';
   body += '<div class="form-group"><label><input type="checkbox" name="comment"' + (data.comment !== false ? " checked" : "") + '> 开启评论</label></div>';
-  // 来源/授权
   body += '<div class="form-group"><label>来源链接</label><input type="text" name="sourceLink" value="' + esc(data.sourceLink || "") + '"></div>';
   body += '<div class="form-group"><label>授权名称</label><input type="text" name="licenseName" value="' + esc(data.licenseName || "") + '"></div>';
   body += '<div class="form-group"><label>授权链接</label><input type="text" name="licenseUrl" value="' + esc(data.licenseUrl || "") + '"></div>';
-  // 密码
   body += '<div class="form-group"><label>密码保护</label><input type="text" name="password" value="' + esc(data.password || "") + '" placeholder="留空不加密"></div>';
   body += '<div class="form-group"><label>密码提示</label><input type="text" name="passwordHint" value="' + esc(data.passwordHint || "") + '"></div>';
-
   body += '</div>'; // form-grid
 
   // 编辑器
@@ -349,19 +524,28 @@ function serveEditor(slug, res) {
   body += '<div class="preview-panel" id="preview" style="display:none"></div></div></div>';
 
   // 操作按钮
-  body += '<div class="form-actions"><button type="submit" class="btn btn-primary" id="saveBtn">保存并推送</button><a href="/" class="btn btn-ghost">取消</a></div>';
+  body += '<div class="form-actions">';
+  body += '<button type="submit" name="action" value="push" class="btn btn-primary" id="saveBtn">保存并推送</button>';
+  body += '<button type="submit" name="action" value="stage" class="btn btn-warning" id="stageBtn">保存并暂存</button>';
+  if (staged) {
+    body += '<button type="button" class="btn btn-ghost" onclick="unstage()" style="margin-left:auto">取消暂存</button>';
+  }
+  body += '<a href="/" class="btn btn-ghost">取消</a>';
+  body += '</div>';
   body += '</form></div>';
 
-  // ── 脚本（使用外部 JS 文件避免转义问题） ──
   body += '<script src="/editor.js"></script>';
   body += '<script>';
-  body += 'initEditor(' + JSON.stringify({ image: data.image || "" }) + ');';
+  body += 'initEditor(' + JSON.stringify({ image: data.image || "", slug: slug || "" }) + ');';
+  if (staged) {
+    body += 'function unstage(){fetch("/api/staging/remove",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({slug:"' + esc(slug) + '"})}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("已取消暂存","info");setTimeout(function(){location.reload()},500)}else{showToast("操作失败","error")}})}';
+  }
   body += '</script>';
 
   res.send(wrapHTML(formTitle, body));
 }
 
-// ── 编辑器 JS（静态文件，避免内联转义地狱） ──
+// ── 编辑器 JS ──
 app.get("/editor.js", function(req, res) {
   res.setHeader("Content-Type", "application/javascript");
   res.send([
@@ -369,7 +553,16 @@ app.get("/editor.js", function(req, res) {
     'function initEditor(cfg) {',
     '  var pv = false;',
     '',
-    '  // 预览切换',
+    '  // 系统时钟',
+    '  var sysTimeEl = document.getElementById("sysTime");',
+    '  function pad2(n) { return String(n).padStart(2, "0"); }',
+    '  function syncClock() {',
+    '    var now = new Date();',
+    '    sysTimeEl.textContent = pad2(now.getHours()) + ":" + pad2(now.getMinutes()) + ":" + pad2(now.getSeconds());',
+    '  }',
+    '  syncClock(); setInterval(syncClock, 1000);',
+    '',
+    '  // 预览',
     '  function togglePreview() {',
     '    pv = !pv;',
     '    document.getElementById("preview").style.display = pv ? "block" : "none";',
@@ -404,7 +597,7 @@ app.get("/editor.js", function(req, res) {
     '  }',
     '  window.switchCoverTab = switchCoverTab;',
     '',
-    '  // 更新封面显示（核心修复：用 /api/thumb/ 路由，而非原始路径）',
+    '  // 更新封面显示',
     '  function updateImageDisplay(val) {',
     '    document.getElementById("imageField").value = val;',
     '    document.getElementById("imageCurrentValue").textContent = val || "(空)";',
@@ -419,14 +612,13 @@ app.get("/editor.js", function(req, res) {
     '  }',
     '  window.updateImageDisplay = updateImageDisplay;',
     '',
-    '  // 上传逻辑（核心修复：重置 file input、修复缩略图路由、显示文件大小）',
+    '  // 上传',
     '  var uz = document.getElementById("uploadZone");',
     '  var fi = document.getElementById("fileInput");',
     '  uz.addEventListener("dragover", function(e) { e.preventDefault(); uz.classList.add("dragover"); });',
     '  uz.addEventListener("dragleave", function() { uz.classList.remove("dragover"); });',
     '  uz.addEventListener("drop", function(e) {',
-    '    e.preventDefault();',
-    '    uz.classList.remove("dragover");',
+    '    e.preventDefault(); uz.classList.remove("dragover");',
     '    if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files);',
     '  });',
     '  fi.addEventListener("change", function() { if (fi.files.length) uploadFiles(fi.files); });',
@@ -437,7 +629,7 @@ app.get("/editor.js", function(req, res) {
     '    fd.append("file", file);',
     '    var hint = document.getElementById("uploadHint");',
     '    hint.textContent = "上传中...";',
-    '    fi.value = ""; // 重置，允许再次上传同一文件',
+    '    fi.value = "";',
     '    fetch("/api/upload", { method: "POST", body: fd })',
     '      .then(function(r) { return r.json(); })',
     '      .then(function(j) {',
@@ -447,7 +639,7 @@ app.get("/editor.js", function(req, res) {
     '          var pv = document.getElementById("coverPreview");',
     '          pv.src = "/api/thumb/" + encodeURIComponent(j.path);',
     '          pv.classList.add("active");',
-    '          hint.innerHTML = "上传成功: " + j.filename + " (" + j.size + ")<br><span style=\\"font-size:12px\\">可继续上传或切换到其他标签页</span>";',
+    '          hint.innerHTML = "上传成功: " + j.filename + " (" + j.size + ")";',
     '        } else {',
     '          showToast("\\u274c " + (j.error || "上传失败"), "error");',
     '          hint.textContent = "点击或拖拽图片到此处上传";',
@@ -459,7 +651,7 @@ app.get("/editor.js", function(req, res) {
     '      });',
     '  }',
     '',
-    '  // 已有图片列表',
+    '  // 已有图片',
     '  function loadGallery() {',
     '    fetch("/api/images")',
     '      .then(function(r) { return r.json(); })',
@@ -490,7 +682,7 @@ app.get("/editor.js", function(req, res) {
     '      });',
     '  }',
     '',
-    '  // 手动输入同步',
+    '  // 手动输入',
     '  var manualInput = document.getElementById("manualImageInput");',
     '  manualInput.addEventListener("input", function() { updateImageDisplay(this.value); });',
     '  manualInput.value = document.getElementById("imageField").value;',
@@ -498,13 +690,18 @@ app.get("/editor.js", function(req, res) {
     '  // 表单提交',
     '  document.getElementById("postForm").addEventListener("submit", function(e) {',
     '    e.preventDefault();',
-    '    var btn = document.getElementById("saveBtn");',
-    '    setLoading(btn, true);',
+    '    var submitBtn = e.submitter;',
+    '    var action = submitBtn ? submitBtn.value : "push";',
+    '    setLoading(submitBtn, true);',
     '    var fd = new FormData(e.target);',
+    '    var dateVal = fd.get("publishedDate") || new Date().toISOString().slice(0, 10);',
+    '    var now = new Date();',
+    '    var timeVal = pad2(now.getHours()) + ":" + pad2(now.getMinutes()) + ":" + pad2(now.getSeconds());',
+    '    var dtVal = dateVal + " " + timeVal;',
     '    var b = {',
     '      title: fd.get("title"),',
     '      slug: fd.get("slug"),',
-    '      published: fd.get("published"),',
+    '      published: dtVal,',
     '      tags: fd.get("tags"),',
     '      category: fd.get("category"),',
     '      description: fd.get("description"),',
@@ -519,7 +716,8 @@ app.get("/editor.js", function(req, res) {
     '      licenseUrl: fd.get("licenseUrl"),',
     '      password: fd.get("password"),',
     '      passwordHint: fd.get("passwordHint"),',
-    '      content: fd.get("content")',
+    '      content: fd.get("content"),',
+    '      action: action',
     '    };',
     '    fetch("/api/post", {',
     '      method: "POST",',
@@ -530,15 +728,19 @@ app.get("/editor.js", function(req, res) {
     '    .then(function(j) {',
     '      if (j.ok) {',
     '        showToast("\\u2705 " + j.message, "success", 4000);',
-    '        setTimeout(function() { location.href = "/"; }, 1500);',
+    '        if (action === "stage" && j.redirect === "new") {',
+    '          setTimeout(function() { location.href = "/new"; }, 1200);',
+    '        } else {',
+    '          setTimeout(function() { location.href = "/"; }, 1500);',
+    '        }',
     '      } else {',
     '        showToast("\\u274c " + (j.error || "保存失败"), "error", 5000);',
-    '        setLoading(btn, false);',
+    '        setLoading(submitBtn, false);',
     '      }',
     '    })',
     '    .catch(function() {',
     '      showToast("\\u274c 网络错误", "error");',
-    '      setLoading(btn, false);',
+    '      setLoading(submitBtn, false);',
     '    });',
     '  });',
     '}'
@@ -554,6 +756,7 @@ app.post("/api/post", async function(req, res) {
     var published = body.published;
     var tags = body.tags;
     var content = body.content;
+    var action = body.action || "push";
 
     if (!slug || !slug.trim()) {
       slug = (title || "").toLowerCase().replace(/[^\w\u4e00-\u9fff\s-]/g, "").replace(/[\s_]+/g, "-").replace(/^-|-$/g, "") || ("post-" + Date.now());
@@ -564,7 +767,7 @@ app.post("/api/post", async function(req, res) {
 
     var fm = {
       title: title || slug,
-      published: published || new Date().toISOString().slice(0, 10),
+      published: published || new Date().toISOString().slice(0, 19).replace("T", " "),
       draft: body.draft || false,
       description: body.description || "",
       image: body.image || "",
@@ -585,11 +788,18 @@ app.post("/api/post", async function(req, res) {
     var filePath = path.join(POSTS_DIR, slug + ".md");
     fs.writeFileSync(filePath, fileContent, "utf-8");
 
-    await git.add(".");
-    await git.commit("📝 更新文章: " + (title || slug));
-    await git.push("origin", currentBranch);
-
-    res.json({ ok: true, message: "文章「" + (title || slug) + "」已保存并推送", slug: slug });
+    if (action === "stage") {
+      // 暂存：只写文件，不提交不推送
+      addToStaging(slug, title || slug);
+      res.json({ ok: true, message: "「" + (title || slug) + "」已保存到暂存列表", slug: slug, redirect: "new" });
+    } else {
+      // 推送：提交并推送到仓库
+      await git.add(".");
+      await git.commit("📝 更新文章: " + (title || slug));
+      await git.push("origin", currentBranch);
+      removeFromStaging(slug);
+      res.json({ ok: true, message: "「" + (title || slug) + "」已保存并推送到仓库", slug: slug });
+    }
   } catch (e) {
     console.error("Save error:", e);
     res.json({ ok: false, error: e.message });
@@ -604,6 +814,7 @@ app.delete("/api/post/:slug", async function(req, res) {
     if (!filePath) return res.json({ ok: false, error: "文件不存在" });
 
     fs.unlinkSync(filePath);
+    removeFromStaging(slug);
     await git.add(".");
     await git.commit("🗑️ 删除文章: " + slug);
     await git.push("origin", currentBranch);
@@ -611,6 +822,60 @@ app.delete("/api/post/:slug", async function(req, res) {
     res.json({ ok: true, message: "文章「" + slug + "」已删除并推送" });
   } catch (e) {
     console.error("Delete error:", e);
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// ── API: 单篇推送 ──
+app.post("/api/staging/push-single", async function(req, res) {
+  try {
+    var slugs = (req.body.slugs || []).filter(Boolean);
+    if (slugs.length === 0) return res.json({ ok: false, error: "无有效文章" });
+
+    for (var i = 0; i < slugs.length; i++) {
+      removeFromStaging(slugs[i]);
+    }
+
+    await git.add(".");
+    await git.commit("📦 暂存推送: " + slugs.join(", "));
+    await git.push("origin", currentBranch);
+
+    res.json({ ok: true, message: slugs.length + " 篇文章已推送到仓库" });
+  } catch (e) {
+    console.error("Push single error:", e);
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// ── API: 批量推送 ──
+app.post("/api/staging/batch-push", async function(req, res) {
+  try {
+    var stagingList = loadStaging();
+    if (stagingList.length === 0) return res.json({ ok: false, error: "暂存列表为空" });
+
+    var count = stagingList.length;
+    var slugs = stagingList.map(function(s) { return s.slug; });
+
+    saveStaging([]);
+    await git.add(".");
+    await git.commit("📦 批量推送 " + count + " 篇文章: " + slugs.join(", "));
+    await git.push("origin", currentBranch);
+
+    res.json({ ok: true, message: count + " 篇文章已全部推送到仓库" });
+  } catch (e) {
+    console.error("Batch push error:", e);
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// ── API: 移除暂存 ──
+app.post("/api/staging/remove", function(req, res) {
+  try {
+    var slug = req.body.slug;
+    if (!slug) return res.json({ ok: false, error: "缺少 slug" });
+    removeFromStaging(slug);
+    res.json({ ok: true, message: "已从暂存列表移除" });
+  } catch (e) {
     res.json({ ok: false, error: e.message });
   }
 });
