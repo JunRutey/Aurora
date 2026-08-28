@@ -95,10 +95,6 @@ pnpm preview
 - **二级域名：** [DNSHE](https://github.com/dnshe/DNSHE-FreeDomains) — 免费二级域名服务
 - **DNS 托管：** [Cloudflare](https://www.cloudflare.com) — DNS 解析与安全防护
 
-### 访问地址
-- **博客主页：** https://junrutey.github.io/Aurora/
-- **评论管理面板：** https://luoliloli.ccwu.cc/ui
-
 ## 🙏 致谢
 
 - [**fuwari**](https://github.com/saicaca/fuwari) by [saicaca](https://github.com/saicaca) — 上游模板
