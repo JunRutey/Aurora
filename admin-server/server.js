@@ -708,19 +708,10 @@ app.get("/editor.js", function(req, res) {
     '    setLoading(submitBtn, true);',
     '    var fd = new FormData(e.target);',
     '    var dateVal = fd.get("publishedDate") || new Date().toISOString().slice(0, 10);',
-    '    var now = new Date();',
-    '    var timeVal = pad2(now.getHours()) + ":" + pad2(now.getMinutes()) + ":" + pad2(now.getSeconds());',
-    '    var dtVal = (function(){',
-    '      var offset = -now.getTimezoneOffset();',
-    '      var sign = offset >= 0 ? "+" : "-";',
-    '      var offH = pad2(Math.floor(Math.abs(offset) / 60));',
-    '      var offM = pad2(Math.abs(offset) % 60);',
-    '      return dateVal + "T" + timeVal + sign + offH + ":" + offM;',
-    '    })();',
     '    var b = {',
     '      title: fd.get("title"),',
     '      slug: fd.get("slug"),',
-    '      published: dtVal,',
+    '      published: dateVal,',
     '      tags: fd.get("tags"),',
     '      category: fd.get("category"),',
     '      description: fd.get("description"),',
@@ -784,9 +775,23 @@ app.post("/api/post", async function(req, res) {
 
     if (!fs.existsSync(POSTS_DIR)) fs.mkdirSync(POSTS_DIR, { recursive: true });
 
+    // 后端自动获取当前时间：仅日期→补UTC时间；完整ISO→直接解析
+    var now = new Date();
+    var publishedDate;
+    if (!published) {
+      publishedDate = now;
+    } else if (published.indexOf("T") >= 0) {
+      publishedDate = new Date(published);
+    } else {
+      var utcHH = String(now.getUTCHours()).padStart(2, "0");
+      var utcMM = String(now.getUTCMinutes()).padStart(2, "0");
+      var utcSS = String(now.getUTCSeconds()).padStart(2, "0");
+      publishedDate = new Date(published + "T" + utcHH + ":" + utcMM + ":" + utcSS + ".000Z");
+    }
+
     var fm = {
       title: title || slug,
-      published: published ? new Date(published.replace(" ", "T")) : new Date(),
+      published: publishedDate,
       draft: body.draft || false,
       description: body.description || "",
       image: body.image || "",
