@@ -89,11 +89,17 @@ pnpm preview
 ## 🚀 部署信息
 
 ### 托管平台
-- **前端托管：** [Vercel](https://vercel.com) — 自动化部署与全球 CDN 加速
+- **博客托管：** [GitHub Pages](https://pages.github.com) — 静态网站托管
 - **评论系统：** [Waline](https://waline.js.org) — 匿名评论系统，支持 Markdown
+- **评论托管：** [Vercel](https://vercel.com) — Waline 服务端部署
 - **评论数据库：** [Neon](https://neon.tech) — Serverless PostgreSQL 数据库
 - **二级域名：** [DNSHE](https://github.com/dnshe/DNSHE-FreeDomains) — 免费二级域名服务
 - **DNS 托管：** [Cloudflare](https://www.cloudflare.com) — DNS 解析与安全防护
+
+### 访问地址
+- **博客主页：** https://junrutey.github.io/Aurora/
+- **评论服务：** https://luoliloli.ccwu.cc/
+- **评论管理面板：** https://luoliloli.ccwu.cc/ui
 
 ## 🙏 致谢
 
