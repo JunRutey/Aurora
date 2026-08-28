@@ -193,12 +193,22 @@ function formatBytes(b) {
   return (b / 1048576).toFixed(1) + " MB";
 }
 
+function formatDateShanghai(d) {
+  var sh = new Date(d.toLocaleString("en-US", { timeZone: "Asia/Shanghai" }));
+  var y = sh.getFullYear();
+  var mo = String(sh.getMonth() + 1).padStart(2, "0");
+  var dd = String(sh.getDate()).padStart(2, "0");
+  var hh = String(sh.getHours()).padStart(2, "0");
+  var mm = String(sh.getMinutes()).padStart(2, "0");
+  var ss = String(sh.getSeconds()).padStart(2, "0");
+  return y + "-" + mo + "-" + dd + "T" + hh + ":" + mm + ":" + ss + "+08:00";
+}
+
 function serializeFM(data) {
   var out = {};
   for (var k in data) {
     if (data[k] instanceof Date) {
-      // 带Z后缀，确保前端能正确识别UTC时间
-      out[k] = data[k].toISOString();
+      out[k] = formatDateShanghai(data[k]);
     } else {
       out[k] = data[k];
     }
@@ -781,18 +791,19 @@ app.post("/api/post", async function(req, res) {
 
     if (!fs.existsSync(POSTS_DIR)) fs.mkdirSync(POSTS_DIR, { recursive: true });
 
-    // 后端自动获取当前时间：仅日期→补UTC时间；完整ISO→直接解析
+    // 后端自动获取当前时间：使用上海时区（Asia/Shanghai, UTC+8）
     var now = new Date();
+    var shanghaiNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Shanghai" }));
     var publishedDate;
     if (!published) {
-      publishedDate = now;
+      publishedDate = shanghaiNow;
     } else if (published.indexOf("T") >= 0) {
       publishedDate = new Date(published);
     } else {
-      var utcHH = String(now.getUTCHours()).padStart(2, "0");
-      var utcMM = String(now.getUTCMinutes()).padStart(2, "0");
-      var utcSS = String(now.getUTCSeconds()).padStart(2, "0");
-      publishedDate = new Date(published + "T" + utcHH + ":" + utcMM + ":" + utcSS + ".000Z");
+      var shHH = String(shanghaiNow.getHours()).padStart(2, "0");
+      var shMM = String(shanghaiNow.getMinutes()).padStart(2, "0");
+      var shSS = String(shanghaiNow.getSeconds()).padStart(2, "0");
+      publishedDate = new Date(published + "T" + shHH + ":" + shMM + ":" + shSS + "+08:00");
     }
 
     var fm = {
