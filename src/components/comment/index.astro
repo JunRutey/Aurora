@@ -5,6 +5,7 @@ import Key from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
 import { removeFileExtension } from "@/utils/url-utils";
 import Giscus from "./Giscus.astro";
+import Waline from "./Waline.astro";
 
 interface Props {
 	post?: CollectionEntry<"posts"> | CollectionEntry<"spec">;
@@ -41,6 +42,7 @@ const commentService: string = commentConfig?.type || "none";
       </div>
       <div class="relative z-10 pl-2 pr-2">
         {commentService === "giscus" && <Giscus />}
+        {commentService === "waline" && <Waline />}
       </div>
     </div>
   )

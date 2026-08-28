@@ -1,9 +1,9 @@
 export type CommentConfig = {
 	/**
 	 * 当前启用的评论系统类型
-	 * "none" | "giscus"
+	 * "none" | "giscus" | "waline"
 	 */
-	type: "none" | "giscus";
+	type: "none" | "giscus" | "waline";
 	giscus?: {
 		repo: string;
 		repoId: string;
@@ -16,5 +16,37 @@ export type CommentConfig = {
 		inputPosition: string;
 		lang: string;
 		loading: string;
+	};
+	waline?: {
+		serverURL: string;
+		locale?: {
+			ADMIN?: string;
+			BOTTOM_TIPS?: string;
+			COMMENT?: string;
+			MORE?: string;
+			PAGEHOLDER?: string;
+			PREVIEW?: string;
+			SUBMIT?: string;
+			SUCCESS?: string;
+			[key: string]: string;
+		};
+		meta?: string[];
+		requiredMeta?: string[];
+		deep?: number;
+		avatar?: string;
+		avatarCDN?: string;
+		highlight?: boolean;
+		highlighter?: string;
+		copyright?: boolean;
+		locale?: {
+			[key: string]: string;
+		};
+		recaptchaV3Key?: string;
+		mathTag?: boolean;
+		floating?: boolean;
+		avatarDefault?: string;
+		turnout?: boolean;
+		emoji?: string[];
+		imageUploader?: false;
 	};
 };

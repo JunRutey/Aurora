@@ -1,8 +1,8 @@
 import type { CommentConfig } from "../types/commentConfig";
 
 export const commentConfig: CommentConfig = {
-	// 评论系统类型: 仅保留 Giscus (GitHub 登录评论)
-	type: "giscus",
+	// 评论系统类型: "giscus" | "waline" | "none"
+	type: "waline",
 
 	// Giscus 评论系统配置
 	giscus: {
@@ -17,5 +17,37 @@ export const commentConfig: CommentConfig = {
 		inputPosition: "top",
 		lang: "zh-CN",
 		loading: "lazy",
+	},
+
+	// Waline 评论系统配置
+	waline: {
+		serverURL: "https://your-domain.vercel.app", // 请替换为你的 Waline 服务器地址
+		locale: {
+			ADMIN: "博主",
+			BOTTOM_TIPS: "",
+			COMMENT: "评论",
+			MORE: "更多",
+			PAGEHOLDER: "请写下你的评论...",
+			PREVIEW: "预览",
+			SUBMIT: "提交",
+			SUCCESS: "提交成功！",
+		},
+		meta: ["nick", "mail", "link"],
+		requiredMeta: ["nick", "mail"],
+		deep: 3,
+		avatar: "mp",
+		highlight: true,
+		copyright: true,
+		recaptchaV3Key: "",
+		mathTag: false,
+		floating: true,
+		avatarDefault: "mp",
+		turnout: false,
+		emoji: [
+			"//unpkg.com/@waline/emojis@1.2.0/qq",
+			// "//unpkg.com/@waline/emojis@1.2.0/bili",
+			// "//unpkg.com/@waline/emojis@1.2.0/weibo",
+		],
+		imageUploader: false,
 	},
 };

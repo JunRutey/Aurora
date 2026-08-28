@@ -1,0 +1,107 @@
+---
+import { commentConfig } from "@/config";
+
+if (!commentConfig?.waline) {
+	throw new Error("Waline comments are not configured");
+}
+
+const waline = commentConfig.waline;
+
+// Waline 需要动态加载，这里使用 ESM 版本
+const walineCSSUrl = "https://unpkg.com/@waline/client@v3/dist/waline.css";
+const walineJSUrl = "https://unpkg.com/@waline/client@v3/dist/waline.js";
+---
+
+<!-- Waline 样式 -->
+<link rel="stylesheet" href={walineCSSUrl} />
+
+<!-- Waline 评论容器 -->
+<div id="waline"></div>
+
+<script is:inline define:vars={{ waline }}>
+  async function initWaline() {
+    try {
+      const { init } = await import('https://unpkg.com/@waline/client@v3/dist/waline.js');
+      
+      init({
+        el: '#waline',
+        serverURL: waline.serverURL,
+        locale: waline.locale || {},
+        meta: waline.meta || ['nick', 'mail', 'link'],
+        requiredMeta: waline.requiredMeta || ['nick', 'mail'],
+        deep: waline.deep || 3,
+        avatar: waline.avatar || 'mp',
+        highlight: waline.highlight !== false,
+        copyright: waline.copyright !== false,
+        recaptchaV3Key: waline.recaptchaV3Key || '',
+        mathTag: waline.mathTag || false,
+        floating: waline.floating !== false,
+        avatarDefault: waline.avatarDefault || 'mp',
+        turnout: waline.turnout || false,
+        emoji: waline.emoji || ['//unpkg.com/@waline/emojis@1.2.0/qq'],
+        imageUploader: waline.imageUploader !== false,
+      });
+      
+      console.log('Waline initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize Waline:', error);
+    }
+  }
+
+  // 初始化 Waline
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initWaline);
+  } else {
+    initWaline();
+  }
+
+  // 主题切换时重新初始化 Waline
+  function updateWalineTheme() {
+    const isDark = document.documentElement.classList.contains('dark');
+    const walineElement = document.getElementById('waline');
+    if (walineElement) {
+      // Waline 会自动处理主题切换
+      // 这里可以根据需要手动触发重新渲染
+    }
+  }
+
+  // 监听主题变化
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+        updateWalineTheme();
+      }
+    });
+  });
+
+  observer.observe(document.documentElement, { attributes: true });
+</script>
+
+<style>
+  #waline {
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 0;
+  }
+
+  /* Waline 样式覆盖 */
+  :root {
+    --waline-theme-color: var(--primary);
+    --waline-border-color: var(--border-color);
+    --waline-bg-color: var(--card-bg);
+    --waline-text-color: var(--btn-content);
+    --waline-secondary-color: var(--content-meta);
+    --waline-reply-color: var(--primary);
+    --waline-max-comment-width: 100%;
+  }
+
+  .dark {
+    --waline-theme-color: var(--primary);
+    --waline-border-color: var(--border-color);
+    --waline-bg-color: var(--card-bg);
+    --waline-text-color: var(--btn-content);
+    --waline-secondary-color: var(--content-meta);
+    --waline-reply-color: var(--primary);
+  }
+</style>
