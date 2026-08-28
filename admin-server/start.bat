@@ -2,10 +2,6 @@
 chcp 65001 >nul 2>&1
 title Aurora Admin Server
 
-:: 获取脚本所在目录（仓库根目录）
-set "ROOT=%~dp0"
-set "ADMIN=%ROOT%admin-server"
-
 echo.
 echo  ╔══════════════════════════════════════╗
 echo  ║     Aurora Admin Server Launcher     ║
@@ -22,9 +18,8 @@ if errorlevel 1 (
 )
 
 :: 检查并安装依赖
-if not exist "%ADMIN%\node_modules" (
+if not exist "node_modules" (
     echo  [信息] 首次运行，正在安装依赖...
-    cd /d "%ADMIN%"
     call npm install
     if errorlevel 1 (
         echo  [错误] 依赖安装失败
@@ -42,7 +37,6 @@ echo  按 Ctrl+C 停止服务
 echo  ─────────────────────────────────────
 echo.
 
-cd /d "%ADMIN%"
 node server.js
 
 pause
