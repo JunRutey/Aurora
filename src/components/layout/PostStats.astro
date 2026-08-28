@@ -2,7 +2,7 @@
 import { Icon } from "astro-icon/components";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
-import { formatDateToYYYYMMDD } from "@/utils/date-utils";
+import { formatDateTimeWithSeconds } from "@/utils/date-utils";
 
 export interface Props {
 	published: Date;
@@ -45,7 +45,7 @@ const iconClass = "text-sm";
         </div>
       )}
       <span class={textClass}>
-        {!showIcons && `${i18n(I18nKey.publishedAt)} `}{formatDateToYYYYMMDD(published)}
+        {!showIcons && `${i18n(I18nKey.publishedAt)} `}{formatDateTimeWithSeconds(published)}
       </span>
     </div>
   )}

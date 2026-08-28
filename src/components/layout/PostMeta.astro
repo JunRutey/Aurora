@@ -3,7 +3,7 @@ import { Icon } from "astro-icon/components";
 import { commentConfig } from "@/config";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
-import { formatDateToYYYYMMDD } from "@/utils/date-utils";
+import { formatDateTimeWithSeconds } from "@/utils/date-utils";
 import { getCategoryUrl, getTagUrl } from "@/utils/url-utils";
 
 export interface Props {
@@ -90,7 +90,7 @@ const visibleTags =
           />
         </div>
         <span class="text-50 text-sm font-medium">
-          {formatDateToYYYYMMDD(published)}
+          {formatDateTimeWithSeconds(published)}
         </span>
       </div>
     )
@@ -109,7 +109,7 @@ const visibleTags =
             />
           </div>
           <span class="text-50 text-sm font-medium">
-            {formatDateToYYYYMMDD(updated)}
+            {formatDateTimeWithSeconds(updated)}
           </span>
         </div>
       )

@@ -4,7 +4,7 @@ import { licenseConfig } from "@/config/licenseConfig";
 import { profileConfig } from "@/config/profileConfig";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
-import { formatDateToYYYYMMDD } from "@/utils/date-utils";
+import { formatDateTimeWithSeconds } from "@/utils/date-utils";
 
 interface Props {
 	title: string;
@@ -71,7 +71,7 @@ const licenseIcon = licenseName
         {i18n(I18nKey.publishedAt)}
       </div>
       <div class="transition text-black/75 dark:text-white/75 line-clamp-2">
-        {formatDateToYYYYMMDD(pubDate)}
+        {formatDateTimeWithSeconds(pubDate)}
       </div>
     </div>
     <div>
