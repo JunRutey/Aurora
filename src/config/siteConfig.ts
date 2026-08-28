@@ -45,8 +45,10 @@ export const siteConfig: SiteConfig = {
 	// 站点副标题
 	subtitle: "",
 
-	// 站点 URL
-	site_url: "https://junrutey.github.io/Aurora",
+	// 站点 URL（Vercel 和 GitHub Pages 自动切换）
+	site_url: process.env.VERCEL
+		? "https://aurora-eight-beryl.vercel.app"
+		: "https://junrutey.github.io/Aurora",
 
 	// 站点描述
 	description:

@@ -60,7 +60,7 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 		// 背景视频播放地址
 		// 支持单个视频路径（字符串）或多个视频循环（数组，参考上面壁纸配置）
 		// 支持远程视频URL，本地视频请放在 public/assets/videos/ 目录下
-		playerUrl: "/Aurora/assets/videos/mihoyo-girls.mp4",
+		playerUrl: `${import.meta.env.BASE_URL ?? "/"}assets/videos/mihoyo-girls.mp4`,
 	},
 	// 横幅壁纸和全屏壁纸共享配置
 	common: {
