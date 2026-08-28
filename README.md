@@ -90,7 +90,7 @@ pnpm preview
 
 ### 托管平台
 - **博客托管：** [GitHub Pages](https://pages.github.com) — 静态网站托管
-- **评论系统：** [Waline](https://waline.js.org) — 匿名评论系统，支持 Markdown
+- **评论系统：** [Waline](https://github.com/walinejs/waline) — 匿名评论系统，支持 Markdown
 - **评论托管：** [Vercel](https://vercel.com) — Waline 服务端部署
 - **评论数据库：** [Neon](https://neon.tech) — Serverless PostgreSQL 数据库
 - **二级域名：** [DNSHE](https://github.com/dnshe/DNSHE-FreeDomains) — 免费二级域名服务
@@ -105,7 +105,7 @@ pnpm preview
 
 - [**fuwari**](https://github.com/saicaca/fuwari) by [saicaca](https://github.com/saicaca) — 上游模板
 - [**Firefly**](https://github.com/CuteLeaf/Firefly) by [CuteLeaf](https://github.com/CuteLeaf) — 博客主题
-- [**Waline**](https://waline.js.org) — 匿名评论系统，为博客提供评论功能
+- [**Waline**](https://github.com/walinejs/waline) — 匿名评论系统，为博客提供评论功能
 - [**DNSHE**](https://github.com/dnshe/DNSHE-FreeDomains) — 免费二级域名服务，提供域名支持
 - [**Astro**](https://astro.build) — 静态站点生成框架
 - [**Svelte**](https://svelte.dev) — UI 组件框架
