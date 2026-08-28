@@ -9,6 +9,7 @@ const multer = require("multer");
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 const POSTS_DIR = path.join(PROJECT_ROOT, "src", "content", "posts");
 const IMAGES_DIR = path.join(PROJECT_ROOT, "src", "assets", "images");
+const PUBLIC_IMAGES_DIR = path.join(PROJECT_ROOT, "public", "assets", "images");
 const STAGING_FILE = path.join(__dirname, ".staging.json");
 const git = simpleGit(PROJECT_ROOT);
 let currentBranch = "main";
@@ -251,7 +252,18 @@ app.post("/api/upload", function(req, res) {
   upload.single("file")(req, res, function(err) {
     if (err) return res.json({ ok: false, error: err.message || "上传失败" });
     if (!req.file) return res.json({ ok: false, error: "未选择文件" });
-    res.json({ ok: true, path: "src/assets/images/" + req.file.filename, filename: req.file.filename, size: formatBytes(req.file.size) });
+    // 同步到 public 目录，确保 markdown 正文中的图片可被 web 服务器直接提供
+    try {
+      if (!fs.existsSync(PUBLIC_IMAGES_DIR)) fs.mkdirSync(PUBLIC_IMAGES_DIR, { recursive: true });
+      fs.copyFileSync(req.file.path, path.join(PUBLIC_IMAGES_DIR, req.file.filename));
+    } catch (e) { /* non-fatal */ }
+    res.json({
+      ok: true,
+      path: "src/assets/images/" + req.file.filename,
+      publicPath: "/assets/images/" + req.file.filename,
+      filename: req.file.filename,
+      size: formatBytes(req.file.size)
+    });
   });
 });
 
@@ -635,6 +647,20 @@ app.get("/editor.js", function(req, res) {
     '          pv.src = "/api/thumb/" + encodeURIComponent(j.path);',
     '          pv.classList.add("active");',
     '          hint.innerHTML = "上传成功: " + j.filename + " (" + j.size + ")";',
+    '          // 插入图片到正文编辑器',
+    '          var ed = document.getElementById("editor");',
+    '          if (ed) {',
+    '            var imgSrc = j.publicPath || ("/assets/images/" + j.filename);',
+    '            var imgMd = "\
+\
+![" + j.filename + "](" + imgSrc + ")\
+\
+";',
+    '            var s = ed.selectionStart, e = ed.selectionEnd;',
+    '            ed.value = ed.value.slice(0, s) + imgMd + ed.value.slice(e);',
+    '            ed.selectionStart = ed.selectionEnd = s + imgMd.length;',
+    '            ed.focus();',
+    '          }',
     '        } else {',
     '          showToast("\\u274c " + (j.error || "上传失败"), "error");',
     '          hint.textContent = "点击或拖拽图片到此处上传";',
@@ -891,6 +917,24 @@ async function start() {
   } catch (e) {
     console.log("⚠️  无法检测 Git 分支，默认使用 main");
   }
+
+    // ── 启动时同步图片到 public ──
+  function syncImagesToPublic() {
+    try {
+      if (!fs.existsSync(IMAGES_DIR)) return;
+      if (!fs.existsSync(PUBLIC_IMAGES_DIR)) fs.mkdirSync(PUBLIC_IMAGES_DIR, { recursive: true });
+      var items = fs.readdirSync(IMAGES_DIR, { withFileTypes: true });
+      for (var i = 0; i < items.length; i++) {
+        var srcPath = path.join(IMAGES_DIR, items[i].name);
+        var dstPath = path.join(PUBLIC_IMAGES_DIR, items[i].name);
+        if (items[i].isFile() && !fs.existsSync(dstPath)) {
+          fs.copyFileSync(srcPath, dstPath);
+        }
+      }
+    } catch (e) { /* non-fatal */ }
+  }
+
+  syncImagesToPublic();
 
   var PORT = process.env.PORT || 3000;
   app.listen(PORT, function() {
