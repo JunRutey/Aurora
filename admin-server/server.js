@@ -120,6 +120,12 @@ const STYLE = [
   ".upload-zone:hover{border-color:#2563eb;color:#2563eb}",
   ".upload-zone.dragover{border-color:#2563eb;background:#eff6ff}",
   ".upload-zone input{display:none}",
+  ".editor-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:6px;padding:6px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px 6px 0 0;border-bottom:none}",
+  ".editor-toolbar .btn{font-size:12px;padding:4px 10px}",
+  ".body-upload-zone{border:2px dashed #e2e8f0;border-radius:6px;padding:14px;text-align:center;color:#94a3b8;cursor:pointer;transition:all .15s;margin-bottom:6px;font-size:13px}",
+  ".body-upload-zone:hover{border-color:#2563eb;color:#2563eb}",
+  ".body-upload-zone.dragover{border-color:#2563eb;background:#eff6ff}",
+  ".body-upload-zone input{display:none}",
   ".cover-tabs{display:flex;gap:0;margin-bottom:12px}",
   ".cover-tab{padding:6px 14px;font-size:13px;border:1px solid #e2e8f0;cursor:pointer;background:#fafafa;color:#64748b;transition:all .15s}",
   ".cover-tab:first-child{border-radius:6px 0 0 6px}",
@@ -172,6 +178,7 @@ function parseDateFlexible(s) {
   if (str.indexOf("T") >= 0) return new Date(str);
   return new Date(str.replace(" ", "T") + "Z");
 }
+function esc(s) {
   if (s == null) return "";
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
@@ -489,28 +496,12 @@ function serveEditor(slug, res) {
   // ── 封面图片区域 ──
   body += '<div class="form-group full"><label>封面图片</label>';
   body += '<div class="cover-section">';
-  body += '<div class="cover-tabs">';
-  body += '<div class="cover-tab active" onclick="switchCoverTab(0)">上传新图</div>';
-  body += '<div class="cover-tab" onclick="switchCoverTab(1)">从已有图片选择</div>';
-  body += '<div class="cover-tab" onclick="switchCoverTab(2)">手动输入路径</div>';
-  body += '</div>';
-  // Tab 0: 上传
-  body += '<div class="cover-tab-content active" id="coverTab0">';
   body += '<div class="cover-row">';
   body += '<div class="cover-upload"><div class="upload-zone" id="uploadZone" onclick="document.getElementById(\'fileInput\').click()">';
   body += '<input type="file" id="fileInput" accept="image/*">';
   body += '<div id="uploadHint">点击或拖拽图片到此处上传<br><span style="font-size:12px">支持 JPG / PNG / GIF / WebP / AVIF / SVG，最大 20MB</span></div>';
   body += '</div></div>';
   body += '<div><img class="cover-preview" id="coverPreview"></div>';
-  body += '</div></div>';
-  // Tab 1
-  body += '<div class="cover-tab-content" id="coverTab1">';
-  body += '<div class="cover-gallery" id="coverGallery"><span style="color:#94a3b8;font-size:13px">加载中...</span></div>';
-  body += '</div>';
-  // Tab 2
-  body += '<div class="cover-tab-content" id="coverTab2">';
-  body += '<input type="text" id="manualImageInput" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px" placeholder="./images/cover.avif 或 api 或留空">';
-  body += '<div class="help-text" style="margin-top:4px">留空 = 无封面 | 填 "api" = 随机图片 | 填路径 = 指定图片</div>';
   body += '</div>';
   // 隐藏字段 + 预览
   body += '<input type="hidden" name="image" id="imageField" value="' + esc(data.image || "") + '">';
@@ -536,7 +527,15 @@ function serveEditor(slug, res) {
 
   // 编辑器
   body += '<div style="margin-top:20px"><div style="display:flex;align-items:center;gap:12px;margin-bottom:8px"><label style="font-size:13px;font-weight:500;color:#475569">正文（Markdown）</label><button type="button" class="btn btn-ghost btn-sm" onclick="togglePreview()">预览</button></div>';
-  body += '<div class="editor-layout"><div class="form-group editor"><textarea name="content" id="editor" placeholder="在这里写 Markdown...">' + esc(content) + '</textarea></div>';
+  body += '<div class="editor-layout"><div class="form-group editor" style="padding:0">';
+  body += '<div class="editor-toolbar">';
+  body += '<button type="button" class="btn btn-ghost btn-sm" onclick="toggleBodyUpload()">📷 插入图片</button>';
+  body += '</div>';
+  body += '<div id="bodyUploadPanel" style="display:none;padding:0 10px 6px">';
+  body += '<div class="body-upload-zone" id="bodyUploadZone" onclick="document.getElementById(\'bodyFileInput\').click()">';
+  body += '<input type="file" id="bodyFileInput" accept="image/*">';
+  body += '点击或拖拽图片到此处上传，自动插入到正文光标位置</div></div>';
+  body += '<textarea name="content" id="editor" placeholder="在这里写 Markdown...">' + esc(content) + '</textarea></div>';
   body += '<div class="preview-panel" id="preview" style="display:none"></div></div></div>';
 
   // 操作按钮
@@ -605,14 +604,6 @@ app.get("/editor.js", function(req, res) {
     '  }',
     '  document.getElementById("editor").addEventListener("input", function() { if (pv) updPreview(); });',
     '',
-    '  // Tab 切换',
-    '  function switchCoverTab(idx) {',
-    '    document.querySelectorAll(".cover-tab").forEach(function(t, i) { t.classList.toggle("active", i === idx); });',
-    '    document.querySelectorAll(".cover-tab-content").forEach(function(c, i) { c.classList.toggle("active", i === idx); });',
-    '    if (idx === 1) loadGallery();',
-    '  }',
-    '  window.switchCoverTab = switchCoverTab;',
-    '',
     '  // 更新封面显示',
     '  function updateImageDisplay(val) {',
     '    document.getElementById("imageField").value = val;',
@@ -668,41 +659,52 @@ app.get("/editor.js", function(req, res) {
     '      });',
     '  }',
     '',
-    '  // 已有图片',
-    '  function loadGallery() {',
-    '    fetch("/api/images")',
+    '  // ── 正文图片上传 ──',
+    '  function toggleBodyUpload() {',
+    '    var p = document.getElementById("bodyUploadPanel");',
+    '    p.style.display = p.style.display === "none" ? "block" : "none";',
+    '  }',
+    '  window.toggleBodyUpload = toggleBodyUpload;',
+    '',
+    '  var bodyUz = document.getElementById("bodyUploadZone");',
+    '  var bodyFi = document.getElementById("bodyFileInput");',
+    '  bodyUz.addEventListener("dragover", function(e) { e.preventDefault(); bodyUz.classList.add("dragover"); });',
+    '  bodyUz.addEventListener("dragleave", function() { bodyUz.classList.remove("dragover"); });',
+    '  bodyUz.addEventListener("drop", function(e) {',
+    '    e.preventDefault(); bodyUz.classList.remove("dragover");',
+    '    if (e.dataTransfer.files.length) uploadBodyImage(e.dataTransfer.files[0]);',
+    '  });',
+    '  bodyFi.addEventListener("change", function() { if (bodyFi.files.length) uploadBodyImage(bodyFi.files[0]); bodyFi.value = ""; });',
+    '',
+    '  function uploadBodyImage(file) {',
+    '    var fd = new FormData();',
+    '    fd.append("file", file);',
+    '    bodyUz.textContent = "上传中...";',
+    '    fetch("/api/upload", { method: "POST", body: fd })',
     '      .then(function(r) { return r.json(); })',
     '      .then(function(j) {',
-    '        var g = document.getElementById("coverGallery");',
-    '        if (!j.ok || !j.images.length) {',
-    '          g.innerHTML = \'<span style="color:#94a3b8;font-size:13px">暂无图片</span>\';',
-    '          return;',
+    '        if (j.ok) {',
+    '          var ed = document.getElementById("editor");',
+    '          var md = "\
+![" + j.filename + "](" + j.publicPath + ")\
+";',
+    '          var s = ed.selectionStart, e = ed.selectionEnd;',
+    '          ed.value = ed.value.slice(0, s) + md + ed.value.slice(e);',
+    '          ed.selectionStart = ed.selectionEnd = s + md.length;',
+    '          ed.focus();',
+    '          showToast("\\u2705 已插入图片: " + j.filename, "success");',
+    '          bodyUz.innerHTML = \'<input type="file" id="bodyFileInput" accept="image/*">点击或拖拽图片到此处上传，自动插入到正文光标位置\';',
+    '          bodyFi = document.getElementById("bodyFileInput");',
+    '          bodyFi.addEventListener("change", function() { if (bodyFi.files.length) uploadBodyImage(bodyFi.files[0]); bodyFi.value = ""; });',
+    '        } else {',
+    '          showToast("\\u274c " + (j.error || "上传失败"), "error");',
+    '          bodyUz.innerHTML = \'<input type="file" id="bodyFileInput" accept="image/*">点击或拖拽图片到此处上传，自动插入到正文光标位置\';',
+    '          bodyFi = document.getElementById("bodyFileInput");',
+    '          bodyFi.addEventListener("change", function() { if (bodyFi.files.length) uploadBodyImage(bodyFi.files[0]); bodyFi.value = ""; });',
     '        }',
-    '        g.innerHTML = "";',
-    '        j.images.forEach(function(img) {',
-    '          var el = document.createElement("img");',
-    '          el.className = "cover-gallery-item";',
-    '          el.src = "/api/thumb/" + encodeURIComponent(img);',
-    '          el.title = img;',
-    '          el.onclick = function() {',
-    '            updateImageDisplay(img);',
-    '            showToast("\\u2705 已选择: " + img, "info", 2000);',
-    '            document.querySelectorAll(".cover-gallery-item").forEach(function(x) { x.classList.remove("selected"); });',
-    '            el.classList.add("selected");',
-    '          };',
-    '          if (document.getElementById("imageField").value === img) el.classList.add("selected");',
-    '          g.appendChild(el);',
-    '        });',
     '      })',
-    '      .catch(function() {',
-    '        document.getElementById("coverGallery").innerHTML = \'<span style="color:#ef4444;font-size:13px">加载失败</span>\';',
-    '      });',
+    '      .catch(function(e) { showToast("\\u274c 网络错误: " + e.message, "error"); });',
     '  }',
-    '',
-    '  // 手动输入',
-    '  var manualInput = document.getElementById("manualImageInput");',
-    '  manualInput.addEventListener("input", function() { updateImageDisplay(this.value); });',
-    '  manualInput.value = document.getElementById("imageField").value;',
     '',
     '  // 表单提交',
     '  document.getElementById("postForm").addEventListener("submit", function(e) {',
