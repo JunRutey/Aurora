@@ -112,7 +112,7 @@ export class AssetsCache {
 	async put(url: string | Request, response: Response): Promise<void> {
 		const cache = await this.cacheReady;
 		if (!cache) return;
-		const request = typeof url === "string" ? new Request(url) : response;
+		const request = typeof url === "string" ? new Request(url) : url;
 
 		// 只缓存成功的 GET 请求
 		if (response.ok && response.type === "basic") {

@@ -20,14 +20,14 @@ export type CommentConfig = {
 	waline?: {
 		serverURL: string;
 		locale?: {
-			ADMIN?: string;
-			BOTTOM_TIPS?: string;
-			COMMENT?: string;
-			MORE?: string;
-			PAGEHOLDER?: string;
-			PREVIEW?: string;
-			SUBMIT?: string;
-			SUCCESS?: string;
+			ADMIN: string;
+			BOTTOM_TIPS: string;
+			COMMENT: string;
+			MORE: string;
+			PAGEHOLDER: string;
+			PREVIEW: string;
+			SUBMIT: string;
+			SUCCESS: string;
 			[key: string]: string;
 		};
 		meta?: string[];

@@ -178,7 +178,7 @@ const labels = {
   }
 
   // 通过缓存桥接层读写密码（替代直接 sessionStorage 操作）
-  function getPassword(slug: string): string | null {
+  function getPassword(slug) {
     try {
       // @ts-expect-error __cache 由 CacheInit.astro 安装
       return window.__cache?.content?.getPassword(slug) ?? null;
@@ -187,7 +187,7 @@ const labels = {
     }
   }
 
-  function setPassword(slug: string, password: string): void {
+  function setPassword(slug, password) {
     try {
       // @ts-expect-error __cache 由 CacheInit.astro 安装
       window.__cache?.content?.setPassword(slug, password);

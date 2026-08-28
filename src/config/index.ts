@@ -25,7 +25,6 @@ export type {
 	NavBarConfig,
 	PlantUMLConfig,
 	ProfileConfig,
-	SakuraConfig,
 	SidebarLayoutConfig,
 	SiteConfig,
 	SponsorConfig,

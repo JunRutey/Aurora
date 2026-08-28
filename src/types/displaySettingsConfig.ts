@@ -52,6 +52,6 @@ export type DisplaySettingsConfig = {
 
 	// ── 特效 (Effects) ────────────────────────────────────
 
-	// 樱花特效开关
-	sakuraSwitchable: boolean;
+	// 樱花特效已移除，类型保留兼容
+	sakuraSwitchable?: boolean;
 };

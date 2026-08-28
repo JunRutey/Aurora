@@ -78,7 +78,7 @@ export class ContentCache {
 
 		// 检查是否需要刷新
 		const meta = this.manager.get<ContentCacheEntry<unknown>>(metaKey);
-		const isStale = !meta || Date.now() - meta.syncedAt >= this.config.memosSyncInterval;
+		const isStale = !meta || Date.now() - meta.sync.syncedAt >= this.config.memosSyncInterval;
 
 		if (!options?.forceRefresh && !isStale) {
 			// 缓存新鲜，直接返回
@@ -187,7 +187,7 @@ export class ContentCache {
 				const cached = this.manager.get<T[]>(cacheKey);
 				// 更新同步时间戳
 				if (existingMeta) {
-					existingMeta.syncedAt = Date.now();
+					existingMeta.sync.syncedAt = Date.now();
 					if (responseEtag) existingMeta.sync.etag = responseEtag;
 					if (responseLastModified) existingMeta.sync.lastModified = responseLastModified;
 					this.manager.set(metaKey, existingMeta);
@@ -348,7 +348,7 @@ export class ContentCache {
 
 		// 检查缓存新鲜度
 		const meta = this.manager.get<ContentCacheEntry<unknown>>(metaKey);
-		if (meta && Date.now() - meta.syncedAt < ttl) {
+		if (meta && Date.now() - meta.sync.syncedAt < ttl) {
 			const cached = this.manager.get<T>(key);
 			if (cached) return cached;
 		}
@@ -371,7 +371,7 @@ export class ContentCache {
 			if (response.status === 304) {
 				const cached = this.manager.get<T>(key);
 				if (meta) {
-					meta.syncedAt = Date.now();
+					meta.sync.syncedAt = Date.now();
 					this.manager.set(metaKey, meta);
 				}
 				return cached as T;
