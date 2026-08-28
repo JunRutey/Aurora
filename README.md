@@ -10,7 +10,7 @@
 ![Node](https://img.shields.io/badge/Node.js-18+-green)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-**🌐 [在线访问](https://junrutey.github.io/Aurora/)** | **⚙️ [评论管理](https://luoliloli.ccwu.cc/ui)**
+**🌐 [在线访问](https://junrutey.github.io/Aurora/)**
 
 </div>
 
@@ -78,34 +78,31 @@ Step 7  Inline JS ─── 内联脚本压缩 + Pagefind 搜索索引
 
 ## ⚙️ 文章编辑后台（Admin Server）
 
-这是本仓库的核心模块之一：一套运行在本地的文章编辑与预览系统，支持对博客内容的可视化管理。
+本地化的文章编辑与预览系统，用于管理博客内容。编辑保存后自动执行 Git commit + push。
 
 ### 架构
 
 ```
 admin-server/
-├─ server.js       主服务（Express，单文件，含所有路由）
+├─ server.js       主服务（Express，单文件）
 ├─ package.json    依赖声明
 └─ README.md       详细部署文档
 ```
 
 - **运行时：** Node.js 18+ / Express
-- **认证：** JWT（用户名密码登录）
-- **端口：** `3002`（可通过环境变量修改）
+- **认证：** 无（仅限本地使用，勿暴露至公网）
+- **端口：** `3000`（可通过环境变量 `PORT` 修改）
 - **工作目录：** 从服务器启动目录向上两级，即仓库根目录
 
 ### 功能概览
 
 | 模块 | 路径 | 说明 |
 |---|---|---|
-| 登录认证 | `/api/auth/login` | JWT Token 验证 |
-| 文章管理 | `/api/posts` | 读取、新建、编辑、删除文章 |
-| 随笔管理 | `/api/notes` | 读取、新建、编辑、删除 Memos |
-| 书签管理 | `/api/bookmarks` | 读取、新建、编辑、删除书签 |
-| 相册管理 | `/api/photos` | 读取、新建、编辑、删除相册 |
-| 媒体上传 | `/api/media/upload` | 图片上传（单张/多张/拖拽） |
-| 主站设置 | `/api/settings` | 站点元信息读取与修改 |
-| 搜索接口 | `/api/search/posts` | 文章标题/内容搜索 |
+| 文章列表 | `GET /` | 展示所有文章，支持编辑/删除 |
+| 新建文章 | `GET /new` | Markdown 编辑器 + 实时预览 |
+| 编辑文章 | `GET /edit?slug=xxx` | 加载已有文章进行编辑 |
+| 保存推送 | `POST /api/post` | 保存文章并自动 git commit + push |
+| 删除文章 | `DELETE /api/post/:slug` | 删除文章并自动 git commit + push |
 
 ### 本地部署（详细步骤）
 
@@ -136,7 +133,7 @@ cd admin-server
 npm install
 ```
 
-> `npm install` 会读取 `package.json`，自动安装 `express` 和 `jsonwebtoken` 两个依赖。
+> `npm install` 会读取 `package.json`，自动安装 `express`、`cors`、`gray-matter`、`simple-git` 等依赖。
 
 #### 步骤 4：启动后台服务
 
@@ -148,8 +145,11 @@ node server.js
 看到以下输出表示启动成功：
 
 ```
-[Server] Aurora Admin Server listening on 3002
-[Server] Site root: C:\Users\xxx\Documents\GitHub\Aurora
+📌 当前 Git 分支: main
+
+🚀 Aurora 后台已启动
+   地址: http://localhost:3000
+   文章目录: C:\Users\xxx\...\Aurora\src\content\posts
 ```
 
 #### 步骤 5：访问管理界面
@@ -157,37 +157,25 @@ node server.js
 打开浏览器访问：
 
 ```
-http://localhost:3002/admin
+http://localhost:3000
 ```
 
-**登录凭据：**
-
-| 项目 | 值 |
-|---|---|
-| 用户名 | `JunRutey` |
-| 密码 | `jun2025` |
-
-> ⚠️ 生产环境部署前，请务必修改 `server.js` 中的 `JWT_SECRET` 和管理员密码。
+> ⚠️ 此后台无登录验证，仅限本地使用。请勿将其暴露至公网环境。
 
 #### 环境变量（可选）
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
-| `PORT` | `3002` | 服务端口 |
-| `ADMIN_USERNAME` | `JunRutey` | 管理员用户名 |
-| `ADMIN_PASSWORD` | `jun2025` | 管理员密码 |
-| `JWT_SECRET` | `aurora-jwt-secret-2026` | JWT 签名密钥 |
-| `CORS_ORIGIN` | `*` | 跨域允许来源 |
-| `MAX_FILE_SIZE` | `50` | 最大上传文件大小（MB） |
+| `PORT` | `3000` | 服务端口 |
 
 启动时可传入环境变量：
 
 ```bash
 # Windows PowerShell
-$env:PORT=8080; $env:ADMIN_PASSWORD='your_password'; node server.js
+$env:PORT=8080; node server.js
 
 # Linux / macOS
-PORT=8080 ADMIN_PASSWORD=your_password node server.js
+PORT=8080 node server.js
 ```
 
 ---
@@ -206,7 +194,7 @@ PORT=8080 ADMIN_PASSWORD=your_password node server.js
 - **框架：** Astro 7 + Svelte 5 + Tailwind CSS
 - **路由：** Swup 单页导航（页面过渡动画）
 - **代码高亮：** Expressive Code（行号 + 折叠 + 语言 Logo）
-- **后台系统：** Node.js + Express + JWT
+- **后台系统：** Node.js + Express + simple-git
 
 ### 📝 内容功能
 - Markdown / MDX 文章支持
