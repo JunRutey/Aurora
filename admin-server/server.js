@@ -40,7 +40,7 @@ var upload = multer({
 });
 
 const FM_DEFAULTS = {
-  title: "", published: new Date().toISOString().slice(0, 19).replace("T", " "), draft: false,
+  title: "", published: new Date().toISOString(), draft: false,
   description: "", image: "", tags: [], category: "", lang: "", pinned: false,
   author: "", sourceLink: "", licenseName: "", licenseUrl: "", comment: true,
   password: "", passwordHint: "",
@@ -166,7 +166,12 @@ const TOAST_SCRIPT = [
   "function setLoading(btn,loading){if(loading){btn.dataset.origText=btn.textContent;btn.textContent='处理中...';btn.disabled=true}else{btn.textContent=btn.dataset.origText||btn.textContent;btn.disabled=false}}"
 ].join("\n");
 
-function esc(s) {
+function parseDateFlexible(s) {
+  if (!s) return new Date(NaN);
+  var str = String(s);
+  if (str.indexOf("T") >= 0) return new Date(str);
+  return new Date(str.replace(" ", "T") + "Z");
+}
   if (s == null) return "";
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
@@ -184,7 +189,7 @@ function formatBytes(b) {
 function serializeFM(data) {
   var out = {};
   for (var k in data) {
-    if (data[k] instanceof Date) out[k] = data[k].toISOString().slice(0, 19).replace("T", " ");
+    if (data[k] instanceof Date) out[k] = data[k].toISOString();
     else out[k] = data[k];
   }
   return out;
@@ -318,7 +323,7 @@ app.get("/", function(req, res) {
       if (p.data.draft) badges.push('<span class="draft-badge">草稿</span>');
       if (p.data.pinned) badges.push('<span class="pinned-badge">置顶</span>');
       if (isStaged(p.slug)) badges.push('<span class="staged-badge">已暂存</span>');
-      var date = p.data.published ? new Date(String(p.data.published).replace(" ", "T")).toLocaleString("zh-CN", { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false }) : "-";
+      var date = p.data.published ? parseDateFlexible(p.data.published).toLocaleString("zh-CN", { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false, timeZone:"Asia/Shanghai" }) : "-";
       return '<tr><td><a href="/edit?slug=' + encodeURIComponent(p.slug) + '">' + esc(p.data.title || p.slug) + '</a> ' + badges.join(" ") + '</td><td>' + date + '</td><td>' + (tags || '<span style="color:#cbd5e1">-</span>') + '</td><td>' + p.size + '</td><td class="actions"><a href="/edit?slug=' + encodeURIComponent(p.slug) + '" class="btn btn-ghost btn-sm">编辑</a><button class="btn btn-danger btn-sm" onclick="deletePost(\'' + esc(p.slug) + '\')">删除</button></td></tr>';
     }).join("\n");
 
@@ -647,20 +652,7 @@ app.get("/editor.js", function(req, res) {
     '          pv.src = "/api/thumb/" + encodeURIComponent(j.path);',
     '          pv.classList.add("active");',
     '          hint.innerHTML = "上传成功: " + j.filename + " (" + j.size + ")";',
-    '          // 插入图片到正文编辑器',
-    '          var ed = document.getElementById("editor");',
-    '          if (ed) {',
-    '            var imgSrc = j.publicPath || ("/assets/images/" + j.filename);',
-    '            var imgMd = "\
-\
-![" + j.filename + "](" + imgSrc + ")\
-\
-";',
-    '            var s = ed.selectionStart, e = ed.selectionEnd;',
-    '            ed.value = ed.value.slice(0, s) + imgMd + ed.value.slice(e);',
-    '            ed.selectionStart = ed.selectionEnd = s + imgMd.length;',
-    '            ed.focus();',
-    '          }',
+    '          // 封面图片仅更新封面字段，不插入正文',
     '        } else {',
     '          showToast("\\u274c " + (j.error || "上传失败"), "error");',
     '          hint.textContent = "点击或拖拽图片到此处上传";',
@@ -718,7 +710,13 @@ app.get("/editor.js", function(req, res) {
     '    var dateVal = fd.get("publishedDate") || new Date().toISOString().slice(0, 10);',
     '    var now = new Date();',
     '    var timeVal = pad2(now.getHours()) + ":" + pad2(now.getMinutes()) + ":" + pad2(now.getSeconds());',
-    '    var dtVal = dateVal + " " + timeVal;',
+    '    var dtVal = (function(){',
+    '      var offset = -now.getTimezoneOffset();',
+    '      var sign = offset >= 0 ? "+" : "-";',
+    '      var offH = pad2(Math.floor(Math.abs(offset) / 60));',
+    '      var offM = pad2(Math.abs(offset) % 60);',
+    '      return dateVal + "T" + timeVal + sign + offH + ":" + offM;',
+    '    })();',
     '    var b = {',
     '      title: fd.get("title"),',
     '      slug: fd.get("slug"),',

@@ -1,6 +1,6 @@
 ---
 title: Hello world!
-published: 2026-08-28 04:11:42
+published: 2026-08-28T04:11:42.000Z
 draft: false
 description: ''
 image: src/assets/images/screenshot-1787944318570-1787946586144.png
