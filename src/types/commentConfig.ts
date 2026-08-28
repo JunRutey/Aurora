@@ -38,9 +38,6 @@ export type CommentConfig = {
 		highlight?: boolean;
 		highlighter?: string;
 		copyright?: boolean;
-		locale?: {
-			[key: string]: string;
-		};
 		recaptchaV3Key?: string;
 		mathTag?: boolean;
 		floating?: boolean;
