@@ -3,3 +3,5 @@ packages:
 allowBuilds:
   esbuild: true
   workerd: true
+overrides:
+  serialize-javascript: ">=7.0.3"
