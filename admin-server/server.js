@@ -46,7 +46,7 @@ const FM_DEFAULTS = {
   password: "", passwordHint: "",
 };
 
-// ── HTML helpers (avoid template literals to prevent backtick conflicts) ──
+// ── HTML helpers ──
 const STYLE = [
   "*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}",
   "body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans SC',sans-serif;background:#fafafa;color:#1a1a1a;line-height:1.6}",
@@ -90,11 +90,9 @@ const STYLE = [
   ".preview-panel pre code{background:none;padding:0;color:inherit}",
   ".cover-section{border:1px solid #e2e8f0;border-radius:8px;padding:16px;background:#fff}",
   ".cover-row{display:flex;gap:16px;align-items:flex-start}",
-  ".cover-row .cover-input{flex:1}",
   ".cover-row .cover-upload{flex:1}",
   ".cover-preview{width:200px;height:120px;border-radius:6px;border:1px solid #e2e8f0;object-fit:cover;background:#f1f5f9;display:none}",
   ".cover-preview.active{display:block}",
-  ".cover-actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}",
   ".cover-gallery{display:flex;gap:8px;overflow-x:auto;padding:8px 0;max-width:100%}",
   ".cover-gallery-item{width:100px;height:64px;border-radius:4px;border:2px solid transparent;object-fit:cover;cursor:pointer;flex-shrink:0;transition:border-color .15s}",
   ".cover-gallery-item:hover{border-color:#94a3b8}",
@@ -209,6 +207,17 @@ app.get("/api/images", function(req, res) {
   }
 });
 
+// ── API: 图片缩略图（统一入口，支持路径中的子目录） ──
+app.get("/api/thumb/*", function(req, res) {
+  // req.params[0] 是通配符匹配到的路径，如 "src/assets/images/xxx.jpg"
+  var relPath = req.params[0] || req.params.filename || "";
+  // 安全检查：防止路径穿越
+  if (relPath.includes("..")) return res.status(403).send("Forbidden");
+  var filePath = path.join(PROJECT_ROOT, relPath);
+  if (!fs.existsSync(filePath)) return res.status(404).send("Not found");
+  res.sendFile(filePath);
+});
+
 // ── 列表页 ──
 app.get("/", function(req, res) {
   try {
@@ -291,7 +300,7 @@ function serveEditor(slug, res) {
   body += '<div class="cover-tab-content active" id="coverTab0">';
   body += '<div class="cover-row">';
   body += '<div class="cover-upload"><div class="upload-zone" id="uploadZone" onclick="document.getElementById(\'fileInput\').click()">';
-  body += '<input type="file" id="fileInput" accept="image/*" multiple>';
+  body += '<input type="file" id="fileInput" accept="image/*">';
   body += '<div id="uploadHint">点击或拖拽图片到此处上传<br><span style="font-size:12px">支持 JPG / PNG / GIF / WebP / AVIF / SVG，最大 20MB</span></div>';
   body += '</div></div>';
   body += '<div><img class="cover-preview" id="coverPreview"></div>';
@@ -309,7 +318,8 @@ function serveEditor(slug, res) {
   body += '<input type="hidden" name="image" id="imageField" value="' + esc(data.image || "") + '">';
   body += '<div style="margin-top:8px;display:flex;align-items:center;gap:12px">';
   body += '<span class="help-text">当前值: <code id="imageCurrentValue">' + esc(data.image || "(空)") + '</code></span>';
-  body += '<img class="cover-preview' + (data.image ? " active" : "") + '" id="currentCover" style="width:80px;height:50px" src="' + (data.image ? esc(data.image) : "") + '">';
+  var thumbSrc = data.image ? "/api/thumb/" + encodeURIComponent(data.image) : "";
+  body += '<img class="cover-preview' + (data.image ? " active" : "") + '" id="currentCover" style="width:80px;height:50px" src="' + esc(thumbSrc) + '">';
   body += '</div>';
   body += '</div></div>';
 
@@ -329,7 +339,7 @@ function serveEditor(slug, res) {
   body += '<div class="form-group"><label>授权链接</label><input type="text" name="licenseUrl" value="' + esc(data.licenseUrl || "") + '"></div>';
   // 密码
   body += '<div class="form-group"><label>密码保护</label><input type="text" name="password" value="' + esc(data.password || "") + '" placeholder="留空不加密"></div>';
-  body += '<div class="form-group"><label>密码提示</label><input type="text" name="passwordHint" value="' + esc(data.passwordHint || "") + '""></div>';
+  body += '<div class="form-group"><label>密码提示</label><input type="text" name="passwordHint" value="' + esc(data.passwordHint || "") + '"></div>';
 
   body += '</div>'; // form-grid
 
@@ -342,47 +352,197 @@ function serveEditor(slug, res) {
   body += '<div class="form-actions"><button type="submit" class="btn btn-primary" id="saveBtn">保存并推送</button><a href="/" class="btn btn-ghost">取消</a></div>';
   body += '</form></div>';
 
-  // 脚本
+  // ── 脚本（使用外部 JS 文件避免转义问题） ──
+  body += '<script src="/editor.js"></script>';
   body += '<script>';
-  // 预览切换
-  body += 'var pv=false;function togglePreview(){pv=!pv;document.getElementById("preview").style.display=pv?"block":"none";if(pv)updPreview()}';
-  body += 'function updPreview(){var md=document.getElementById("editor").value;var h=md.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/^### (.+)$/gm,"<h3>$1</h3>").replace(/^## (.+)$/gm,"<h2>$1</h2>").replace(/^# (.+)$/gm,"<h1>$1</h1>").replace(/\\*\\*(.+?)\\*\\*/g,"<strong>$1</strong>").replace(/\\*(.+?)\\*/g,"<em>$1</em>").replace(/```([\\s\\S]*?)```/g,"<pre><code>$1</code></pre>").replace(/`(.+?)`/g,"<code>$1</code>").replace(/^- (.+)$/gm,"• $1").replace(/\\[(.+?)\\]\\((.+?)\\)/g,"<a href=\\"$2\\">$1</a>").replace(/\\n\\n/g,"</p><p>").replace(/\\n/g,"<br>");document.getElementById("preview").innerHTML="<p>"+h+"</p>"}';
-  body += 'document.getElementById("editor").addEventListener("input",function(){if(pv)updPreview()})';
-  // Tab 切换
-  body += 'function switchCoverTab(idx){document.querySelectorAll(".cover-tab").forEach(function(t,i){t.classList.toggle("active",i===idx)});document.querySelectorAll(".cover-tab-content").forEach(function(c,i){c.classList.toggle("active",i===idx)});if(idx===1)loadGallery()}';
-  // 更新封面显示
-  body += 'function updateImageDisplay(val){document.getElementById("imageField").value=val;document.getElementById("imageCurrentValue").textContent=val||"(空)";var pv=document.getElementById("currentCover");if(val){pv.src=val;pv.classList.add("active")}else{pv.classList.remove("active")}}';
-  // 上传逻辑
-  body += 'var uz=document.getElementById("uploadZone"),fi=document.getElementById("fileInput");';
-  body += 'uz.addEventListener("dragover",function(e){e.preventDefault();uz.classList.add("dragover")});';
-  body += 'uz.addEventListener("dragleave",function(){uz.classList.remove("dragover")});';
-  body += 'uz.addEventListener("drop",function(e){e.preventDefault();uz.classList.remove("dragover");if(e.dataTransfer.files.length)uploadFiles(e.dataTransfer.files)});';
-  body += 'fi.addEventListener("change",function(){if(fi.files.length)uploadFiles(fi.files)});';
-  body += 'function uploadFiles(files){var file=files[0];var fd=new FormData();fd.append("file",file);document.getElementById("uploadHint").textContent="上传中...";fetch("/api/upload",{method:"POST",body:fd}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ 上传成功: "+j.filename,"success");updateImageDisplay(j.path);var pv=document.getElementById("coverPreview");pv.src="/api/upload-preview/"+j.filename;pv.classList.add("active");document.getElementById("uploadHint").textContent="点击或拖拽图片到此处上传\\n支持 JPG / PNG / GIF / WebP / AVIF / SVG，最大 20MB"}else{showToast("❌ "+(j.error||"上传失败"),"error");document.getElementById("uploadHint").textContent="点击或拖拽图片到此处上传"}}).catch(function(){showToast("❌ 网络错误","error");document.getElementById("uploadHint").textContent="点击或拖拽图片到此处上传"})}';
-  // 已有图片列表
-  body += 'function loadGallery(){fetch("/api/images").then(function(r){return r.json()}).then(function(j){var g=document.getElementById("coverGallery");if(!j.ok||!j.images.length){g.innerHTML="<span style=\\"color:#94a3b8;font-size:13px\\">暂无图片</span>";return}g.innerHTML="";j.images.forEach(function(img){var el=document.createElement("img");el.className="cover-gallery-item";el.src="/api/thumb/"+encodeURIComponent(img);el.title=img;el.onclick=function(){updateImageDisplay(img);showToast("✅ 已选择: "+img,"info",2000);document.querySelectorAll(".cover-gallery-item").forEach(function(x){x.classList.remove("selected")});el.classList.add("selected")};if(document.getElementById("imageField").value===img)el.classList.add("selected");g.appendChild(el)})}).catch(function(){document.getElementById("coverGallery").innerHTML="<span style=\\"color:#ef4444;font-size:13px\\">加载失败</span>")})';
-  // 手动输入同步
-  body += 'document.getElementById("manualImageInput").addEventListener("input",function(){updateImageDisplay(this.value)});';
-  body += 'document.getElementById("manualImageInput").value=document.getElementById("imageField").value;';
-  // 提交
-  body += 'document.getElementById("postForm").addEventListener("submit",function(e){e.preventDefault();var btn=document.getElementById("saveBtn");setLoading(btn,true);var fd=new FormData(e.target);var b={title:fd.get("title"),slug:fd.get("slug"),published:fd.get("published"),tags:fd.get("tags"),category:fd.get("category"),description:fd.get("description"),image:fd.get("image"),author:fd.get("author"),lang:fd.get("lang"),draft:fd.has("draft"),pinned:fd.has("pinned"),comment:fd.has("comment"),sourceLink:fd.get("sourceLink"),licenseName:fd.get("licenseName"),licenseUrl:fd.get("licenseUrl"),password:fd.get("password"),passwordHint:fd.get("passwordHint"),content:fd.get("content")};fetch("/api/post",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ "+j.message,"success",4000);setTimeout(function(){location.href="/"},1500)}else{showToast("❌ "+(j.error||"保存失败"),"error",5000)}}).catch(function(){showToast("❌ 网络错误","error")});setLoading(btn,false)})';
+  body += 'initEditor(' + JSON.stringify({ image: data.image || "" }) + ');';
   body += '</script>';
 
   res.send(wrapHTML(formTitle, body));
 }
 
-// ── API: 图片缩略图 ──
-app.get("/api/thumb/:filename", function(req, res) {
-  var filePath = path.join(IMAGES_DIR, req.params.filename);
-  if (!fs.existsSync(filePath)) return res.status(404).send("Not found");
-  res.sendFile(filePath);
-});
-
-// ── API: 上传预览（临时保存的文件直接返回） ──
-app.get("/api/upload-preview/:filename", function(req, res) {
-  var filePath = path.join(IMAGES_DIR, req.params.filename);
-  if (!fs.existsSync(filePath)) return res.status(404).send("Not found");
-  res.sendFile(filePath);
+// ── 编辑器 JS（静态文件，避免内联转义地狱） ──
+app.get("/editor.js", function(req, res) {
+  res.setHeader("Content-Type", "application/javascript");
+  res.send([
+    '// Aurora Admin Editor',
+    'function initEditor(cfg) {',
+    '  var pv = false;',
+    '',
+    '  // 预览切换',
+    '  function togglePreview() {',
+    '    pv = !pv;',
+    '    document.getElementById("preview").style.display = pv ? "block" : "none";',
+    '    if (pv) updPreview();',
+    '  }',
+    '  window.togglePreview = togglePreview;',
+    '',
+    '  function updPreview() {',
+    '    var md = document.getElementById("editor").value;',
+    '    var h = md',
+    '      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")',
+    '      .replace(/^### (.+)$/gm, "<h3>$1</h3>")',
+    '      .replace(/^## (.+)$/gm, "<h2>$1</h2>")',
+    '      .replace(/^# (.+)$/gm, "<h1>$1</h1>")',
+    '      .replace(/\\*\\*(.+?)\\*\\*/g, "<strong>$1</strong>")',
+    '      .replace(/\\*(.+?)\\*/g, "<em>$1</em>")',
+    '      .replace(/```([\\s\\S]*?)```/g, "<pre><code>$1</code></pre>")',
+    '      .replace(/`(.+?)`/g, "<code>$1</code>")',
+    '      .replace(/^- (.+)$/gm, "\\u2022 $1")',
+    '      .replace(/\\[(.+?)\\]\\((.+?)\\)/g, \'<a href="$2">$1</a>\')',
+    '      .replace(/\\n\\n/g, "</p><p>")',
+    '      .replace(/\\n/g, "<br>");',
+    '    document.getElementById("preview").innerHTML = "<p>" + h + "</p>";',
+    '  }',
+    '  document.getElementById("editor").addEventListener("input", function() { if (pv) updPreview(); });',
+    '',
+    '  // Tab 切换',
+    '  function switchCoverTab(idx) {',
+    '    document.querySelectorAll(".cover-tab").forEach(function(t, i) { t.classList.toggle("active", i === idx); });',
+    '    document.querySelectorAll(".cover-tab-content").forEach(function(c, i) { c.classList.toggle("active", i === idx); });',
+    '    if (idx === 1) loadGallery();',
+    '  }',
+    '  window.switchCoverTab = switchCoverTab;',
+    '',
+    '  // 更新封面显示（核心修复：用 /api/thumb/ 路由，而非原始路径）',
+    '  function updateImageDisplay(val) {',
+    '    document.getElementById("imageField").value = val;',
+    '    document.getElementById("imageCurrentValue").textContent = val || "(空)";',
+    '    var pv = document.getElementById("currentCover");',
+    '    if (val) {',
+    '      pv.src = "/api/thumb/" + encodeURIComponent(val);',
+    '      pv.classList.add("active");',
+    '    } else {',
+    '      pv.src = "";',
+    '      pv.classList.remove("active");',
+    '    }',
+    '  }',
+    '  window.updateImageDisplay = updateImageDisplay;',
+    '',
+    '  // 上传逻辑（核心修复：重置 file input、修复缩略图路由、显示文件大小）',
+    '  var uz = document.getElementById("uploadZone");',
+    '  var fi = document.getElementById("fileInput");',
+    '  uz.addEventListener("dragover", function(e) { e.preventDefault(); uz.classList.add("dragover"); });',
+    '  uz.addEventListener("dragleave", function() { uz.classList.remove("dragover"); });',
+    '  uz.addEventListener("drop", function(e) {',
+    '    e.preventDefault();',
+    '    uz.classList.remove("dragover");',
+    '    if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files);',
+    '  });',
+    '  fi.addEventListener("change", function() { if (fi.files.length) uploadFiles(fi.files); });',
+    '',
+    '  function uploadFiles(files) {',
+    '    var file = files[0];',
+    '    var fd = new FormData();',
+    '    fd.append("file", file);',
+    '    var hint = document.getElementById("uploadHint");',
+    '    hint.textContent = "上传中...";',
+    '    fi.value = ""; // 重置，允许再次上传同一文件',
+    '    fetch("/api/upload", { method: "POST", body: fd })',
+    '      .then(function(r) { return r.json(); })',
+    '      .then(function(j) {',
+    '        if (j.ok) {',
+    '          showToast("\\u2705 上传成功: " + j.filename, "success");',
+    '          updateImageDisplay(j.path);',
+    '          var pv = document.getElementById("coverPreview");',
+    '          pv.src = "/api/thumb/" + encodeURIComponent(j.path);',
+    '          pv.classList.add("active");',
+    '          hint.innerHTML = "上传成功: " + j.filename + " (" + j.size + ")<br><span style=\\"font-size:12px\\">可继续上传或切换到其他标签页</span>";',
+    '        } else {',
+    '          showToast("\\u274c " + (j.error || "上传失败"), "error");',
+    '          hint.textContent = "点击或拖拽图片到此处上传";',
+    '        }',
+    '      })',
+    '      .catch(function(e) {',
+    '        showToast("\\u274c 网络错误: " + e.message, "error");',
+    '        hint.textContent = "点击或拖拽图片到此处上传";',
+    '      });',
+    '  }',
+    '',
+    '  // 已有图片列表',
+    '  function loadGallery() {',
+    '    fetch("/api/images")',
+    '      .then(function(r) { return r.json(); })',
+    '      .then(function(j) {',
+    '        var g = document.getElementById("coverGallery");',
+    '        if (!j.ok || !j.images.length) {',
+    '          g.innerHTML = \'<span style="color:#94a3b8;font-size:13px">暂无图片</span>\';',
+    '          return;',
+    '        }',
+    '        g.innerHTML = "";',
+    '        j.images.forEach(function(img) {',
+    '          var el = document.createElement("img");',
+    '          el.className = "cover-gallery-item";',
+    '          el.src = "/api/thumb/" + encodeURIComponent(img);',
+    '          el.title = img;',
+    '          el.onclick = function() {',
+    '            updateImageDisplay(img);',
+    '            showToast("\\u2705 已选择: " + img, "info", 2000);',
+    '            document.querySelectorAll(".cover-gallery-item").forEach(function(x) { x.classList.remove("selected"); });',
+    '            el.classList.add("selected");',
+    '          };',
+    '          if (document.getElementById("imageField").value === img) el.classList.add("selected");',
+    '          g.appendChild(el);',
+    '        });',
+    '      })',
+    '      .catch(function() {',
+    '        document.getElementById("coverGallery").innerHTML = \'<span style="color:#ef4444;font-size:13px">加载失败</span>\';',
+    '      });',
+    '  }',
+    '',
+    '  // 手动输入同步',
+    '  var manualInput = document.getElementById("manualImageInput");',
+    '  manualInput.addEventListener("input", function() { updateImageDisplay(this.value); });',
+    '  manualInput.value = document.getElementById("imageField").value;',
+    '',
+    '  // 表单提交',
+    '  document.getElementById("postForm").addEventListener("submit", function(e) {',
+    '    e.preventDefault();',
+    '    var btn = document.getElementById("saveBtn");',
+    '    setLoading(btn, true);',
+    '    var fd = new FormData(e.target);',
+    '    var b = {',
+    '      title: fd.get("title"),',
+    '      slug: fd.get("slug"),',
+    '      published: fd.get("published"),',
+    '      tags: fd.get("tags"),',
+    '      category: fd.get("category"),',
+    '      description: fd.get("description"),',
+    '      image: fd.get("image"),',
+    '      author: fd.get("author"),',
+    '      lang: fd.get("lang"),',
+    '      draft: fd.has("draft"),',
+    '      pinned: fd.has("pinned"),',
+    '      comment: fd.has("comment"),',
+    '      sourceLink: fd.get("sourceLink"),',
+    '      licenseName: fd.get("licenseName"),',
+    '      licenseUrl: fd.get("licenseUrl"),',
+    '      password: fd.get("password"),',
+    '      passwordHint: fd.get("passwordHint"),',
+    '      content: fd.get("content")',
+    '    };',
+    '    fetch("/api/post", {',
+    '      method: "POST",',
+    '      headers: { "Content-Type": "application/json" },',
+    '      body: JSON.stringify(b)',
+    '    })',
+    '    .then(function(r) { return r.json(); })',
+    '    .then(function(j) {',
+    '      if (j.ok) {',
+    '        showToast("\\u2705 " + j.message, "success", 4000);',
+    '        setTimeout(function() { location.href = "/"; }, 1500);',
+    '      } else {',
+    '        showToast("\\u274c " + (j.error || "保存失败"), "error", 5000);',
+    '        setLoading(btn, false);',
+    '      }',
+    '    })',
+    '    .catch(function() {',
+    '      showToast("\\u274c 网络错误", "error");',
+    '      setLoading(btn, false);',
+    '    });',
+    '  });',
+    '}'
+  ].join("\n"));
 });
 
 // ── API: 保存文章 ──
