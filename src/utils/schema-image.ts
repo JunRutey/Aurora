@@ -18,10 +18,11 @@ async function loadLocalImage(
 	src: string,
 	basePath: string,
 ): Promise<ImageMetadata | null> {
-	const rel = src.replace(/^\.\//, "");
-	const full = path
-		.normalize(path.join(basePath || "", rel))
-		.replace(/\\/g, "/");
+	// admin 面板传入的绝对路径（从项目根起），直接按 src/ 相对解析
+	const rel = src.startsWith("src/") ? src.replace(/^src\//, "") : src.replace(/^\.\//, "");
+	const full = src.startsWith("src/")
+		? rel
+		: path.normalize(path.join(basePath || "", rel)).replace(/\\/g, "/");
 	const key = `/src/${full}`;
 	const loader = projectImages[key];
 	if (!loader) {

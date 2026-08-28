@@ -79,9 +79,16 @@ if (isLocal) {
 			import: "default",
 		},
 	);
-	let normalizedPath = path
-		.normalize(path.join("../../", basePath, src))
-		.replace(/\\/g, "/");
+	let normalizedPath;
+	if (src.startsWith("src/")) {
+		normalizedPath = path
+			.normalize(path.join("../../", src.replace(/^src\//, "")))
+			.replace(/\\/g, "/");
+	} else {
+		normalizedPath = path
+			.normalize(path.join("../../", basePath, src))
+			.replace(/\\/g, "/");
+	}
 	const file = files[normalizedPath];
 	if (!file) {
 		console.error(
