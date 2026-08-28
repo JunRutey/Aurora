@@ -267,63 +267,43 @@ export class ContentCache {
 	}
 
 	// ═══════════════════════════════════════════════════════════
-	// 加密密码缓存（兼容现有 sessionStorage 逻辑）
+	// 加密密码缓存（通过 CacheManager 统一管理）
 	// ═══════════════════════════════════════════════════════════
 
 	/**
-	 * 读取加密文章密码（sessionStorage）
+	 * 读取加密文章密码
 	 */
 	getPassword(slug: string): string | null {
-		if (typeof sessionStorage === "undefined") return null;
-		try {
-			return sessionStorage.getItem(`pw:${slug}`);
-		} catch {
-			return null;
-		}
+		return this.manager.get<string>(`pw:${slug}`);
 	}
 
 	/**
-	 * 写入加密文章密码（sessionStorage）
+	 * 写入加密文章密码
 	 */
 	setPassword(slug: string, password: string): void {
-		if (typeof sessionStorage === "undefined") return;
-		try {
-			sessionStorage.setItem(`pw:${slug}`, password);
-		} catch {
-			// 静默
-		}
+		this.manager.set(`pw:${slug}`, password);
 	}
 
 	// ═══════════════════════════════════════════════════════════
-	// 失败封面图记录
+	// 失败封面图记录（通过 CacheManager 统一管理）
 	// ═══════════════════════════════════════════════════════════
 
 	/**
 	 * 获取失败封面图 URL 集合
 	 */
 	getFailedCovers(): Set<string> {
-		if (typeof localStorage === "undefined") return new Set();
-		try {
-			const raw = localStorage.getItem(KEYS.failedCovers);
-			return new Set(raw ? JSON.parse(raw) : []);
-		} catch {
-			return new Set();
-		}
+		const arr = this.manager.get<string[]>(KEYS.failedCovers);
+		return new Set(arr ?? []);
 	}
 
 	/**
 	 * 记录失败的封面图 URL（最多保留 200 条）
 	 */
 	addFailedCover(url: string): void {
-		if (typeof localStorage === "undefined") return;
-		try {
-			const failed = this.getFailedCovers();
-			failed.add(url);
-			const arr = [...failed].slice(-200);
-			localStorage.setItem(KEYS.failedCovers, JSON.stringify(arr));
-		} catch {
-			// 静默
-		}
+		const failed = this.getFailedCovers();
+		failed.add(url);
+		const arr = [...failed].slice(-200);
+		this.manager.set(KEYS.failedCovers, arr);
 	}
 
 	// ═══════════════════════════════════════════════════════════

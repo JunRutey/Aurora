@@ -1,7 +1,7 @@
 <script lang="ts">
 import TabNav from "@/components/common/TabNav.svelte";
 import type { NsfwMode } from "@/types/nsfw";
-import type { MalCategory } from "@/utils/mal-utils";
+import type { MalCategory } from "@/services";
 import MalSection from "./MalSection.svelte";
 
 interface Props {

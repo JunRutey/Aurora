@@ -8,7 +8,7 @@ import { i18n } from "@i18n/translation";
 import { onMount } from "svelte";
 import { formatDynamicDate } from "@/utils/date-utils";
 import { fetchWithDedup } from "@/utils/fetch-dedup";
-import { fetchMemos } from "@/utils/memos-adapter";
+import { fetchMemos } from "@/services";
 import { url } from "@/utils/url-utils";
 
 interface DynamicEntry {

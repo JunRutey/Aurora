@@ -12,9 +12,9 @@ import { formatDateI18nWithTime } from "@/utils/date-utils";
 import { isVndbNsfw } from "@/utils/nsfw-utils";
 import {
 	buildVndbTabs,
-	fetchVndbUlist,
 	type VndbTab,
 } from "@/utils/vndb-utils";
+import { fetchVndbUlist } from "@/services";
 
 // 检查页面是否启用
 if (!siteConfig.pages.vndb) {

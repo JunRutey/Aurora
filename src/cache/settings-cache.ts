@@ -21,7 +21,7 @@ const DEFAULT_SETTINGS_CONFIG: SettingsCacheConfig = {
 
 // ─── 已知 key 的默认值映射 ────────────────────────────────────
 
-const DEFAULTS: Record<string, unknown> = {
+const DEFAULTS: Record<string, string> = {
 	theme: "auto",
 	hue: "250",
 	wallpaperMode: "normal",

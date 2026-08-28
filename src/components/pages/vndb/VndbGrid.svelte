@@ -9,10 +9,10 @@ import type { VndbUlistEntry } from "@/types/vndb";
 import { isVndbNsfw } from "@/utils/nsfw-utils";
 import {
 	buildVndbTabs,
-	fetchVndbUlist,
 	getVndbItemsForTab,
 	type VndbTab,
 } from "@/utils/vndb-utils";
+import { fetchVndbUlist } from "@/services";
 import VndbSection from "./VndbSection.svelte";
 
 interface Props {
