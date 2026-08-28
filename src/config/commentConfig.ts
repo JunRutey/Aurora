@@ -21,7 +21,7 @@ export const commentConfig: CommentConfig = {
 
 	// Waline 评论系统配置
 	waline: {
-		serverURL: "https://your-domain.vercel.app", // 请替换为你的 Waline 服务器地址
+		serverURL: "https://luoliloli.ccwu.cc/",
 		locale: {
 			ADMIN: "博主",
 			BOTTOM_TIPS: "",
