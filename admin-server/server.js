@@ -68,8 +68,51 @@ function removeFromStaging(slug) {
   return list;
 }
 
+// ── 安全：速率限制 ──
+var rateLimitStore = {};
+function rateLimit(maxReq, windowMs) {
+  return function(req, res, next) {
+    var ip = req.ip || req.connection.remoteAddress || "unknown";
+    var now = Date.now();
+    if (!rateLimitStore[ip] || now - rateLimitStore[ip].start > windowMs) {
+      rateLimitStore[ip] = { start: now, count: 1 };
+      return next();
+    }
+    rateLimitStore[ip].count++;
+    if (rateLimitStore[ip].count > maxReq) {
+      return res.status(429).json({ ok: false, error: "请求过于频繁，请稍后再试" });
+    }
+    next();
+  };
+}
+
+// ── 安全：Slug 校验与路径防护 ──
+function validateSlug(slug) {
+  if (!slug || typeof slug !== "string") return false;
+  if (/\.\./.test(slug) || /^\//.test(slug) || /\0/.test(slug)) return false;
+  return /^[a-zA-Z0-9\u4e00-\u9fff_-]+$/.test(slug);
+}
+function safeFindPostFile(slug) {
+  if (!validateSlug(slug)) return null;
+  var exts = [".md", ".mdx"];
+  for (var i = 0; i < exts.length; i++) {
+    var p = path.join(POSTS_DIR, slug + exts[i]);
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+function isPathContained(filePath, baseDir) {
+  var resolved = path.resolve(filePath);
+  var base = path.resolve(baseDir);
+  return resolved === base || resolved.startsWith(base + path.sep) || resolved.startsWith(base + "/");
+}
+function sanitizeSlug(slug) {
+  if (!slug || typeof slug !== "string") return "";
+  return slug.replace(/\.\./g, "").replace(/[/\\]/g, "").replace(/[^\w\u4e00-\u9fff-]/g, "").trim();
+}
+
 // ── HTML helpers ──
-const STYLE = [
+var STYLE = [
   "*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}",
   "body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans SC',sans-serif;background:#f5f5f5;color:#1a1a1a;line-height:1.6}",
   "a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}",
@@ -167,7 +210,7 @@ const STYLE = [
   ".staged-badge{display:inline-block;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#92400e;font-size:11px;font-weight:500;margin-left:6px}"
 ].join("\n");
 
-const TOAST_SCRIPT = [
+var TOAST_SCRIPT = [
   "function showToast(msg,type,duration){duration=duration||3000;var t=document.getElementById('toast');t.textContent=msg;t.className='toast '+(type||'info');requestAnimationFrame(function(){t.classList.add('show')});setTimeout(function(){t.classList.remove('show')},duration)}",
   "function setLoading(btn,loading){if(loading){btn.dataset.origText=btn.textContent;btn.textContent='处理中...';btn.disabled=true}else{btn.textContent=btn.dataset.origText||btn.textContent;btn.disabled=false}}"
 ].join("\n");
@@ -181,6 +224,10 @@ function parseDateFlexible(s) {
 function esc(s) {
   if (s == null) return "";
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+function escJS(s) {
+  if (s == null) return "";
+  return String(s).replace(/\\/g,"\\\\").replace(/'/g,"\\'").replace(/"/g,"\\\"").replace(/\n/g,"\\n").replace(/\r/g,"\\r");
 }
 
 function wrapHTML(title, body) {
@@ -233,6 +280,7 @@ function getAllPosts() {
 }
 
 function findPostFile(slug) {
+  if (!validateSlug(slug)) return null;
   var exts = [".md", ".mdx"];
   for (var i = 0; i < exts.length; i++) {
     var p = path.join(POSTS_DIR, slug + exts[i]);
@@ -246,7 +294,9 @@ function scanImages(dir, base) {
   if (!fs.existsSync(dir)) return results;
   var items = fs.readdirSync(dir, { withFileTypes: true });
   for (var i = 0; i < items.length; i++) {
+    if (i >= items.length) break;
     var item = items[i];
+    if (!item || !item.name) continue;
     var full = path.join(dir, item.name);
     var rel = base ? base + "/" + item.name : item.name;
     if (item.isDirectory()) {
@@ -274,14 +324,17 @@ var icInbox = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke
 var icRefresh = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>';
 
 // ── API: 上传图片 ──
-app.post("/api/upload", function(req, res) {
+app.post("/api/upload", rateLimit(30, 60000), function(req, res) {
   upload.single("file")(req, res, function(err) {
     if (err) return res.json({ ok: false, error: err.message || "上传失败" });
     if (!req.file) return res.json({ ok: false, error: "未选择文件" });
     // 同步到 public 目录，确保 markdown 正文中的图片可被 web 服务器直接提供
     try {
       if (!fs.existsSync(PUBLIC_IMAGES_DIR)) fs.mkdirSync(PUBLIC_IMAGES_DIR, { recursive: true });
-      fs.copyFileSync(req.file.path, path.join(PUBLIC_IMAGES_DIR, req.file.filename));
+      var destPath = path.join(PUBLIC_IMAGES_DIR, req.file.filename);
+      if (isPathContained(destPath, PUBLIC_IMAGES_DIR)) {
+        fs.copyFileSync(req.file.path, destPath);
+      }
     } catch (e) { /* non-fatal */ }
     res.json({
       ok: true,
@@ -316,6 +369,7 @@ app.get("/api/thumb/*", function(req, res) {
   var relPath = req.params[0] || "";
   if (relPath.includes("..")) return res.status(403).send("Forbidden");
   var filePath = path.join(PROJECT_ROOT, relPath);
+  if (!isPathContained(filePath, PROJECT_ROOT)) return res.status(403).send("Forbidden");
   if (!fs.existsSync(filePath)) return res.status(404).send("Not found");
   res.sendFile(filePath);
 });
@@ -345,7 +399,7 @@ app.get("/", function(req, res) {
       if (p.data.pinned) badges.push('<span class="pinned-badge">置顶</span>');
       if (isStaged(p.slug)) badges.push('<span class="staged-badge">已暂存</span>');
       var date = p.data.published ? parseDateFlexible(p.data.published).toLocaleString("zh-CN", { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false, timeZone:"Asia/Shanghai" }) : "-";
-      return '<tr><td><a href="/edit?slug=' + encodeURIComponent(p.slug) + '">' + esc(p.data.title || p.slug) + '</a> ' + badges.join(" ") + '</td><td>' + date + '</td><td>' + (tags || '<span style="color:#cbd5e1">-</span>') + '</td><td>' + p.size + '</td><td class="actions"><a href="/edit?slug=' + encodeURIComponent(p.slug) + '" class="btn btn-ghost btn-sm">编辑</a><button class="btn btn-danger btn-sm" onclick="deletePost(\'' + esc(p.slug) + '\')">删除</button></td></tr>';
+      return '<tr><td><a href="/edit?slug=' + encodeURIComponent(p.slug) + '">' + esc(p.data.title || p.slug) + '</a> ' + badges.join(" ") + '</td><td>' + date + '</td><td>' + (tags || '<span style="color:#cbd5e1">-</span>') + '</td><td>' + p.size + '</td><td class="actions"><a href="/edit?slug=' + encodeURIComponent(p.slug) + '" class="btn btn-ghost btn-sm">编辑</a><button class="btn btn-danger btn-sm" onclick="deletePost(\'' + escJS(p.slug) + '\')">删除</button></td></tr>';
     }).join("\n");
 
     // ── Dashboard ──
@@ -437,8 +491,8 @@ app.get("/staging", function(req, res) {
         body += '<td>' + date + '</td>';
         body += '<td class="actions">';
         body += '<a href="/edit?slug=' + encodeURIComponent(s.slug) + '" class="btn btn-ghost btn-sm">编辑</a>';
-        body += '<button class="btn btn-ghost btn-sm" onclick="pushOne(\'' + esc(s.slug) + '\',this)">推送</button>';
-        body += '<button class="btn btn-danger btn-sm" onclick="removeStaged(\'' + esc(s.slug) + '\')">移除</button>';
+        body += '<button class="btn btn-ghost btn-sm" onclick="pushOne(\'' + escJS(s.slug) + '\',this)">推送</button>';
+        body += '<button class="btn btn-danger btn-sm" onclick="removeStaged(\'' + escJS(s.slug) + '\')">移除</button>';
         body += '</td></tr>';
       });
       body += '</tbody></table>';
@@ -461,8 +515,10 @@ app.get("/staging", function(req, res) {
 // ── 编辑/新建页 ──
 app.get("/new", function(req, res) { serveEditor(null, res); });
 app.get("/edit", function(req, res) {
-  if (!req.query.slug) return res.redirect("/");
-  serveEditor(req.query.slug, res);
+  var slug = req.query.slug;
+  if (!slug) return res.redirect("/");
+  if (!validateSlug(slug)) return res.status(400).send(wrapHTML("错误", '<div class="container"><h1>无效的 Slug</h1><p>slug 只能包含字母、数字、中文、连字符和下划线。</p><a href="/" class="btn btn-ghost">← 返回列表</a></div>'));
+  serveEditor(slug, res);
 });
 
 function serveEditor(slug, res) {
@@ -484,6 +540,7 @@ function serveEditor(slug, res) {
 
   var formTitle = isNew ? "新建文章" : "编辑: " + (data.title || slug);
   var staged = isStaged(slug);
+  var safeSlugForJS = escJS(slug || "");
 
   var body = '<div class="container"><header><h1>' + esc(formTitle) + '</h1><a href="/" class="btn btn-ghost">← 返回列表</a></header>';
   body += '<form id="postForm"><div class="form-grid">';
@@ -563,7 +620,7 @@ function serveEditor(slug, res) {
   body += '<script>';
   body += 'initEditor(' + JSON.stringify({ image: data.image || "", slug: slug || "" }) + ');';
   if (staged) {
-    body += 'function unstage(){fetch("/api/staging/remove",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({slug:"' + esc(slug) + '"})}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("已取消暂存","info");setTimeout(function(){location.reload()},500)}else{showToast("操作失败","error")}})}';
+    body += 'function unstage(){fetch("/api/staging/remove",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({slug:"' + safeSlugForJS + '"})}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("已取消暂存","info");setTimeout(function(){location.reload()},500)}else{showToast("操作失败","error")}})}';
   }
   body += '</script>';
 
@@ -695,9 +752,7 @@ app.get("/editor.js", function(req, res) {
     '      .then(function(j) {',
     '        if (j.ok) {',
     '          var ed = document.getElementById("editor");',
-    '          var md = "\
-![" + j.filename + "](" + j.publicPath + ")\
-";',
+    '          var md = "\\n![" + j.filename + "](" + j.publicPath + ")\\n";',
     '          var s = ed.selectionStart, e = ed.selectionEnd;',
     '          ed.value = ed.value.slice(0, s) + md + ed.value.slice(e);',
     '          ed.selectionStart = ed.selectionEnd = s + md.length;',
@@ -774,7 +829,7 @@ app.get("/editor.js", function(req, res) {
 });
 
 // ── API: 保存文章 ──
-app.post("/api/post", async function(req, res) {
+app.post("/api/post", rateLimit(30, 60000), async function(req, res) {
   try {
     var body = req.body;
     var slug = body.slug;
@@ -787,7 +842,12 @@ app.post("/api/post", async function(req, res) {
     if (!slug || !slug.trim()) {
       slug = (title || "").toLowerCase().replace(/[^\w\u4e00-\u9fff\s-]/g, "").replace(/[\s_]+/g, "-").replace(/^-|-$/g, "") || ("post-" + Date.now());
     }
-    slug = slug.trim().replace(/\.md$/, "");
+    slug = sanitizeSlug(slug);
+    slug = slug.replace(/\.md$/, "");
+
+    if (!validateSlug(slug)) {
+      return res.json({ ok: false, error: "无效的 slug，只能包含字母、数字、中文、连字符和下划线" });
+    }
 
     if (!fs.existsSync(POSTS_DIR)) fs.mkdirSync(POSTS_DIR, { recursive: true });
 
@@ -848,10 +908,13 @@ app.post("/api/post", async function(req, res) {
 });
 
 // ── API: 删除文章 ──
-app.delete("/api/post/:slug", async function(req, res) {
+app.delete("/api/post/:slug", rateLimit(30, 60000), async function(req, res) {
   try {
-    var slug = req.params.slug;
-    var filePath = findPostFile(slug);
+    var slug = sanitizeSlug(req.params.slug);
+    if (!validateSlug(slug)) {
+      return res.json({ ok: false, error: "无效的 slug" });
+    }
+    var filePath = safeFindPostFile(slug);
     if (!filePath) return res.json({ ok: false, error: "文件不存在" });
 
     var wasStaged = isStaged(slug);
@@ -878,7 +941,7 @@ app.delete("/api/post/:slug", async function(req, res) {
 // ── API: 单篇推送 ──
 app.post("/api/staging/push-single", async function(req, res) {
   try {
-    var slugs = (req.body.slugs || []).filter(Boolean);
+    var slugs = (req.body.slugs || []).map(function(s) { return sanitizeSlug(s); }).filter(function(s) { return validateSlug(s); });
     if (slugs.length === 0) return res.json({ ok: false, error: "无有效文章" });
 
     for (var i = 0; i < slugs.length; i++) {
@@ -920,8 +983,8 @@ app.post("/api/staging/batch-push", async function(req, res) {
 // ── API: 移除暂存 ──
 app.post("/api/staging/remove", function(req, res) {
   try {
-    var slug = req.body.slug;
-    if (!slug) return res.json({ ok: false, error: "缺少 slug" });
+    var slug = sanitizeSlug(req.body.slug);
+    if (!validateSlug(slug)) return res.json({ ok: false, error: "无效的 slug" });
     removeFromStaging(slug);
     res.json({ ok: true, message: "已从暂存列表移除" });
   } catch (e) {
@@ -945,9 +1008,10 @@ async function start() {
       if (!fs.existsSync(PUBLIC_IMAGES_DIR)) fs.mkdirSync(PUBLIC_IMAGES_DIR, { recursive: true });
       var items = fs.readdirSync(IMAGES_DIR, { withFileTypes: true });
       for (var i = 0; i < items.length; i++) {
+        if (i >= items.length) break;
         var srcPath = path.join(IMAGES_DIR, items[i].name);
         var dstPath = path.join(PUBLIC_IMAGES_DIR, items[i].name);
-        if (items[i].isFile() && !fs.existsSync(dstPath)) {
+        if (items[i].isFile() && isPathContained(dstPath, PUBLIC_IMAGES_DIR) && !fs.existsSync(dstPath)) {
           fs.copyFileSync(srcPath, dstPath);
         }
       }
