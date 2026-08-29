@@ -7,10 +7,10 @@
 ![Astro](https://img.shields.io/badge/Astro-7.x-orange)
 ![TypeScript](https://img.shields.io/badge/TypeScript-blue)
 ![Svelte](https://img.shields.io/badge/Svelte-5-red)
-![Node](https://img.shields.io/badge/Node.js-18+-green)
+![Node](https://img.shields.io/badge/Node.js-24+-green)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-**🌐 [在线访问](https://junrutey.github.io/Aurora/)**
+**🌐 [在线访问](https://lolicute.ccwu.cc/)**
 
 </div>
 
@@ -202,10 +202,15 @@ PORT=8080 node server.js
 - 加密文章（AES-256-GCM，密码缓存到 sessionStorage）
 - GitHub Repo 卡片（构建期静态数据 + 运行时 API 增量更新）
 - 本地音乐播放器
-- 书签导航与相册
+- 书签导航
+- 博客相册（持续完善中）
 - Memos 动态（增量同步）
 - Pagefind 本地搜索
 - RSS 订阅
+
+### 📊 访问统计
+- **Umami** — 隐私优先的访客分析系统
+- **不蒜子** — 轻量级访问量展示（总访问量 / 总访客数）
 
 ---
 
@@ -230,29 +235,46 @@ pnpm preview
 ## 🌐 部署信息
 
 ### 托管平台
-- **博客托管：** [GitHub Pages](https://pages.github.com) — 静态网站托管
+- **博客托管：** [Vercel](https://vercel.com) — 静态网站托管与部署
 - **评论系统：** [Waline](https://github.com/walinejs/waline) — 匿名评论系统，支持 Markdown
 - **评论托管：** [Vercel](https://vercel.com) — Waline 服务端部署
 - **评论数据库：** [Neon](https://neon.tech) — Serverless PostgreSQL 数据库
+- **访客分析：** [Umami](https://umami.is) — 隐私优先的网站分析平台
+- **访问统计：** [不蒜子](https://busuanzi.ibruce.info) — 免费网页计数器
 - **二级域名：** [DNSHE](https://github.com/dnshe/DNSHE-FreeDomains) — 免费二级域名服务
 - **DNS 托管：** [Cloudflare](https://www.cloudflare.com) — DNS 解析与安全防护
 
 ### 访问地址
-- **博客主页：** https://junrutey.github.io/Aurora/
+- **博客主页：** https://lolicute.ccwu.cc/
 - **评论服务：** https://luoliloli.ccwu.cc/
 - **评论管理面板：** https://luoliloli.ccwu.cc/ui
+- **Umami 仪表板：** https://cloud.umami.is/share/Qpo5oYVQZZZsodHO
 
 ---
 
 ## 🙏 致谢
 
+### 主题与模板
 - [**fuwari**](https://github.com/saicaca/fuwari) by [saicaca](https://github.com/saicaca) — 上游模板
 - [**Firefly**](https://github.com/CuteLeaf/Firefly) by [CuteLeaf](https://github.com/CuteLeaf) — 博客主题
+
+### 评论系统
 - [**Waline**](https://github.com/walinejs/waline) — 匿名评论系统
-- [**DNSHE**](https://github.com/dnshe/DNSHE-FreeDomains) — 免费二级域名服务
+
+### 访问统计
+- [**Umami**](https://github.com/umami-software/umami) — 隐私优先的网站分析平台
+- [**不蒜子**](https://busuanzi.ibruce.info) — 免费网页计数器
+
+### 技术栈
 - [**Astro**](https://astro.build) — 静态站点生成框架
 - [**Svelte**](https://svelte.dev) — UI 组件框架
 - [**Tailwind CSS**](https://tailwindcss.com) — CSS 工具类框架
+
+### 服务与托管
+- [**Vercel**](https://vercel.com) — 部署与托管平台
+- [**Neon**](https://neon.tech) — Serverless PostgreSQL 数据库
+- [**Cloudflare**](https://www.cloudflare.com) — DNS 解析与 CDN
+- [**DNSHE**](https://github.com/dnshe/DNSHE-FreeDomains) — 免费二级域名服务
 
 ---
 
