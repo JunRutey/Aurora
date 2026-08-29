@@ -15,7 +15,7 @@ export const musicPlayerConfig: MusicPlayerConfig = {
 	volume: 0.7,
 
 	// 播放模式：'list'=列表循环, 'one'=单曲循环, 'random'=随机播放
-	playMode: "list",
+	playMode: "random",
 
 	// 是否显启用歌词
 	showLyrics: false,
@@ -44,17 +44,17 @@ export const musicPlayerConfig: MusicPlayerConfig = {
 	local: {
 		playlist: [
 			{
-				name: "后会无期",
-				artist: "汪苏泷",
-				url: "/assets/music/后会无期.mp3",
-				cover: "/assets/music/cover/后会无期.jpg",
-				lrc: "",
-			},
-			{
 				name: "坏女孩",
 				artist: "徐良",
 				url: "/assets/music/坏女孩.mp3",
 				cover: "/assets/music/cover/坏女孩.jpg",
+				lrc: "",
+			},
+			{
+				name: "后会无期",
+				artist: "汪苏泷",
+				url: "/assets/music/后会无期.mp3",
+				cover: "/assets/music/cover/后会无期.jpg",
 				lrc: "",
 			},
 			{
