@@ -21,12 +21,12 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 
 {
 	urls.length > 0 && (
-		<div id="bg-player" data-video-prefetch={urlsJson}>
+		<div id="bg-player">
 			<div
 				id="bg-player-overlay"
 				class="absolute inset-0 z-15 overflow-hidden pointer-events-none transition-opacity duration-500 ease-in-out opacity-0"
 			>
-				<video id="bg-player-video" preload="none" playsinline class="size-full object-cover"></video>
+				<video id="bg-player-video" preload="auto" playsinline class="size-full object-cover"></video>
 			</div>
 
 			<div id="bg-player-controls" class="absolute bottom-4 left-4 z-30 flex items-center gap-1.5 group">
@@ -85,29 +85,6 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 		var currentIndex = 0;
 		var errorCount = 0;
 		var toastTimer = null;
-		var VIDEO_CACHE = "aurora-video-v1";
-
-		// ========== 缓存工具 ==========
-
-		/**
-		 * 从 Cache API 获取缓存的视频 Blob URL
-		 */
-		function getCachedBlobUrl(url) {
-			if (!('caches' in window)) return Promise.resolve(null);
-			
-			return caches.open(VIDEO_CACHE).then(function(cache) {
-				return cache.match(url);
-			}).then(function(response) {
-				if (!response) return null;
-				return response.blob().then(function(blob) {
-					return URL.createObjectURL(blob);
-				});
-			}).catch(function() {
-				return null;
-			});
-		}
-
-		// ========== 播放控制 ==========
 
 		function showToast() {
 			if (!toast) return;
@@ -142,29 +119,12 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 			window.dispatchEvent(new CustomEvent("bg-player-state-change", { detail: { playing: isPlaying } }));
 		}
 
-		/**
-		 * 播放视频 - 优先从缓存读取
-		 */
 		function doPlay() {
-			var url = urlList[currentIndex];
-			
-			getCachedBlobUrl(url).then(function(blobUrl) {
-				if (blobUrl) {
-					video.src = blobUrl;
-				} else {
-					video.src = url;
-				}
-				video.muted = true;
-				video.play()
-					.then(function () { setTimeout(function () { if (video) video.muted = false; }, 100); })
-					.catch(function () { isPlaying = false; syncAttr(); });
-			}).catch(function() {
-				video.src = url;
-				video.muted = true;
-				video.play()
-					.then(function () { setTimeout(function () { if (video) video.muted = false; }, 100); })
-					.catch(function () { isPlaying = false; syncAttr(); });
-			});
+			video.src = urlList[currentIndex];
+			video.muted = true;
+			video.play()
+				.then(function () { setTimeout(function () { if (video) video.muted = false; }, 100); })
+				.catch(function () { isPlaying = false; syncAttr(); });
 		}
 
 		function switchTrack(index) {
@@ -173,14 +133,8 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 			if (isPlaying) {
 				doPlay();
 			} else {
-				// 预加载
-				getCachedBlobUrl(urlList[currentIndex]).then(function(blobUrl) {
-					video.src = blobUrl || urlList[currentIndex];
-					video.load();
-				}).catch(function() {
-					video.src = urlList[currentIndex];
-					video.load();
-				});
+				video.src = urlList[currentIndex];
+				video.load();
 			}
 		}
 
@@ -212,15 +166,12 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 		function onError() {
 			errorCount++;
 			if (isMultiple && errorCount < urlList.length) {
+				// 多视频模式下自动尝试下一个
 				currentIndex = pickIndex(currentIndex);
-				getCachedBlobUrl(urlList[currentIndex]).then(function(blobUrl) {
-					video.src = blobUrl || urlList[currentIndex];
-					video.load();
-				}).catch(function() {
-					video.src = urlList[currentIndex];
-					video.load();
-				});
+				video.src = urlList[currentIndex];
+				video.load();
 			} else {
+				// 所有视频都失败或只有单个视频
 				isPlaying = false;
 				if (overlay) { overlay.classList.remove("opacity-100"); overlay.classList.add("opacity-0"); }
 				syncAttr();
@@ -232,6 +183,7 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 		window.addEventListener("bg-player-toggle", toggle);
 		video.addEventListener("ended", onEnded);
 		video.addEventListener("error", onError);
+		// 播放成功时重置错误计数
 		video.addEventListener("playing", function () { errorCount = 0; });
 		if (prevBtn) prevBtn.addEventListener("click", function () { switchTrack(prevIndex()); });
 		if (nextBtn) nextBtn.addEventListener("click", function () { switchTrack(pickIndex(currentIndex)); });
@@ -253,6 +205,7 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 		}
 
 		function cleanup() {
+			// 视频仍在播放时保留属性，供 Navbar 同步按钮状态
 			if (!isPlaying) {
 				document.body.removeAttribute("data-bg-video-playing");
 				document.documentElement.removeAttribute("data-bg-video-playing");
