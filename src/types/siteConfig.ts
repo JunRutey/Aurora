@@ -203,6 +203,16 @@ export type SiteConfig = {
 		uid?: string; // Bilibili 用户 UID
 	};
 
+	// Umami 访问统计显示配置
+	umamiStats?: {
+		// 是否显示访问统计
+		enabled?: boolean;
+		// 显示位置："footer"=页脚 | "sidebar"=侧栏
+		position?: "footer" | "sidebar";
+		// 显示样式："text"=纯文本 | "badge"=徽章
+		style?: "text" | "badge";
+	};
+
 	// 分页配置
 	pagination: {
 		postsPerPage: number; // 每页显示的文章数量

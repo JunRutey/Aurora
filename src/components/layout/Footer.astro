@@ -1,8 +1,9 @@
 ---
 import fs from "node:fs";
 import path from "node:path";
-import { footerConfig, profileConfig } from "@/config";
+import { footerConfig, profileConfig, siteConfig } from "@/config";
 import { url } from "@/utils/url-utils";
+import UmamiStats from "@/components/analytics/UmamiStats.astro";
 
 const currentYear = new Date().getFullYear();
 
@@ -72,6 +73,11 @@ if (footerConfig.enable) {
         href={url("sitemap-index.xml")}>Sitemap</a
       >
     </div>
+    {siteConfig?.umamiStats?.enabled && (
+      <div class="mx-0.5 my-3 flex justify-center">
+        <UmamiStats style={siteConfig.umamiStats.style || "badge"} />
+      </div>
+    )}
     <!-- 
       注意：请勿随意修改或删除 "Powered by Astro & Firefly" 部分，这是对开源项目的尊重和支持。
       如果您需要在底部增加内容，请在src/config/footerConfig.ts中修改enable属性为true，然后编辑src/config/FooterConfig.html文件。

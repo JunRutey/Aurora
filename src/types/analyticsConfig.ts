@@ -14,6 +14,13 @@ export type AnalyticsConfig = {
 			maxDuration?: number; // 单次录制最大时长（毫秒），默认 300000
 			blockSelector?: string; // 需要完全排除录制的元素 CSS 选择器
 		};
+		// 访问统计显示配置
+		stats?: {
+			enabled?: boolean; // 是否启用访问统计显示
+			fetchMode?: "build" | "client"; // 数据获取方式
+			apiUrl?: string; // Umami Cloud API 地址
+			apiKey?: string; // Umami API Key（不要提交到公开仓库）
+		};
 	};
 	la51Analytics?: {
 		Id?: string; // 51la 统计 ID

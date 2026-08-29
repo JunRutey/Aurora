@@ -1,0 +1,126 @@
+---
+/**
+ * Umami 访问统计显示组件
+ * 在页面显示累计访问次数和独立访客数
+ */
+import { analyticsConfig } from "@/config";
+
+interface Props {
+	// 覆盖默认样式
+	style?: "text" | "badge";
+	// 覆盖默认位置
+	class?: string;
+}
+
+const { style = "badge", class: className } = Astro.props;
+
+const statsConfig = analyticsConfig?.umamiAnalytics?.stats;
+const websiteId = analyticsConfig?.umamiAnalytics?.websiteId;
+
+// 如果未启用或缺少必要配置，不渲染
+if (!statsConfig?.enabled || !websiteId) {
+	return null;
+}
+
+// 构建时获取统计数据
+let pageviews = 0;
+let visitors = 0;
+
+if (statsConfig.fetchMode === "build" && statsConfig.apiKey) {
+	try {
+		const apiUrl = statsConfig.apiUrl || "https://api.umami.is";
+		// 获取从网站创建至今的统计数据
+		const endAt = Date.now();
+		const startAt = 0; // 从最早开始
+
+		const url = `${apiUrl}/api/websites/${websiteId}/stats?startAt=${startAt}&endAt=${endAt}`;
+		const response = await fetch(url, {
+			headers: {
+				"x-umami-api-key": statsConfig.apiKey,
+			},
+		});
+
+		if (response.ok) {
+			const data = await response.json();
+			pageviews = data.pageviews || 0;
+			visitors = data.visitors || 0;
+		}
+	} catch (e) {
+		console.warn("Failed to fetch Umami stats:", e);
+	}
+}
+
+// 格式化数字（添加千位分隔符）
+function formatNumber(num: number): string {
+	return num.toLocaleString("zh-CN");
+}
+---
+
+{pageviews > 0 || visitors > 0 ? (
+	<div class:list={["umami-stats", `umami-stats-${style}`, className]}>
+		累计访问次数 {formatNumber(pageviews)}
+		<span class="umami-stats-divider"></span>
+		累计访客 {formatNumber(visitors)}
+	</div>
+) : (
+	<!-- 客户端获取模式占位 -->
+	<div class:list={["umami-stats", `umami-stats-${style}`, "umami-stats-loading", className]} data-umami-stats>
+		累计访问次数 --
+		<span class="umami-stats-divider"></span>
+		累计访客 --
+	</div>
+)}
+
+<style>
+	.umami-stats {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.8125rem;
+		color: var(--text-secondary, #6b7280);
+	}
+
+	.umami-stats-divider {
+		color: inherit;
+		opacity: 0.4;
+	}
+
+	/* Loading 动画 */
+	.umami-stats-loading {
+		opacity: 0.5;
+		animation: umami-pulse 1.5s ease-in-out infinite;
+	}
+
+	@keyframes umami-pulse {
+		0%, 100% { opacity: 0.5; }
+		50% { opacity: 1; }
+	}
+</style>
+
+<script is:inline data-swup-ignore-script>
+// 客户端获取模式（需要代理 API）
+(function() {
+	const statsEl = document.querySelector('[data-umami-stats]');
+	if (!statsEl) return;
+
+	const config = {
+		enabled: false, // 需要配置代理 API
+		apiUrl: '',
+		websiteId: ''
+	};
+
+	if (!config.enabled || !config.apiUrl || !config.websiteId) return;
+
+	fetch(`${config.apiUrl}/api/websites/${config.websiteId}/stats?startAt=0&endAt=${Date.now()}`)
+		.then(r => r.json())
+		.then(data => {
+			const values = statsEl.querySelectorAll('.umami-stats-value');
+			if (values[0]) values[0].textContent = (data.pageviews || 0).toLocaleString('zh-CN');
+			if (values[1]) values[1].textContent = (data.visitors || 0).toLocaleString('zh-CN');
+			statsEl.classList.remove('umami-stats-loading');
+		})
+		.catch(() => {
+			// 静默失败
+		});
+})();
+</script>

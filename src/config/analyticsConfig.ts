@@ -8,7 +8,7 @@ export const analyticsConfig: AnalyticsConfig = {
 	// Umami 统计配置
 	umamiAnalytics: {
 		// Umami Website ID
-		websiteId: "",
+		websiteId: "12d68a2d-a2c2-44fd-97de-e12455beab58",
 		// Umami JS地址，支持使用自建
 		scriptUrl: "https://cloud.umami.is/script.js",
 		// Umami 会话回放脚本地址，支持使用自建
@@ -29,6 +29,18 @@ export const analyticsConfig: AnalyticsConfig = {
 			maxDuration: 300000,
 			// 需要排除录制的元素 CSS 选择器，例如 ".sensitive-widget"
 			blockSelector: "",
+		},
+		// 访问统计显示配置（用于在页面显示累计访问次数和人次）
+		stats: {
+			// 是否启用访问统计显示
+			enabled: true,
+			// 数据获取方式："build"=构建时获取 | "client"=客户端获取（需代理）
+			fetchMode: "build",
+			// Umami Cloud API 地址（仅 fetchMode 为 "build" 时使用）
+			apiUrl: "https://api.umami.is",
+			// Umami API Key（仅 fetchMode 为 "build" 时使用，不要提交到公开仓库！）
+			// 环境变量: UMAMI_API_KEY
+			apiKey: "",
 		},
 	},
 	// 51la 统计配置
