@@ -3,6 +3,9 @@ import GoogleAnalytics from "@components/analytics/GoogleAnalytics.astro";
 import La51Analytics from "@components/analytics/La51Analytics.astro";
 import MicrosoftClarity from "@components/analytics/MicrosoftClarity.astro";
 import UmamiAnalytics from "@components/analytics/UmamiAnalytics.astro";
+import VercelAnalytics from "@components/analytics/VercelAnalytics.astro";
+import CacheBootstrap from "@components/features/CacheBootstrap.astro";
+import CacheInit from "@components/features/CacheInit.astro";
 import CodeGroupManager from "@components/features/CodeGroupManager.astro";
 import FancyboxManager from "@components/features/FancyboxManager.astro";
 import FontSetup from "@components/features/FontSetup.astro";
@@ -11,8 +14,6 @@ import MusicManager from "@components/features/MusicManager.astro";
 import MusicPlayerView from "@components/features/MusicPlayerView.astro";
 // 樱花特效已移除
 import WavesEffect from "@components/features/WavesEffect.astro";
-import CacheBootstrap from "@components/features/CacheBootstrap.astro";
-import CacheInit from "@components/features/CacheInit.astro";
 import ConfigCarrier from "@components/layout/ConfigCarrier.astro";
 
 import {
@@ -156,6 +157,9 @@ const siteLogo = await getSiteLogo();
             hashMode={analyticsConfig.la51Analytics?.hashMode}
             screenRecord={analyticsConfig.la51Analytics?.screenRecord}
             />
+    )}
+    {analyticsConfig?.vercelAnalytics?.enabled && (
+            <VercelAnalytics />
     )}
 
     <title>{pageTitle}</title>
@@ -408,7 +412,7 @@ const siteLogo = await getSiteLogo();
         }
       })();
 
-      // 初始化横幅标题显示状态 - 在 html 元素上设置属性，CSS 会立即生效
+      // 初始化横幅标��显示状态 - 在 html 元素上设置属性，CSS 会立即生效
       (function applyBannerTitleEnabled() {
         const bannerTitleEnabled = localStorage.getItem("bannerTitleEnabled");
         if (bannerTitleEnabled !== null) {
