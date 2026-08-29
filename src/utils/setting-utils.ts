@@ -339,17 +339,35 @@ export function initWallpaperMode(): void {
 	applyWallpaperModeToDocument(storedMode, false);
 }
 
+/**
+ * 获取当前设备的默认壁纸模式
+ * 移动端优先使用 mobileMode，桌面端使用 mode
+ */
+function getDefaultWallpaperMode(): WALLPAPER_MODE {
+	const isMobile =
+		typeof window !== "undefined" && window.innerWidth < 768;
+	if (isMobile && backgroundWallpaper.mobileMode) {
+		return backgroundWallpaper.mobileMode;
+	}
+	return backgroundWallpaper.mode;
+}
+
+/**
+ * 获取已存储的壁纸模式
+ * 用户手动修改过 → 使用用户设置
+ * 未修改过 → 使用当前设备对应的默认值（移动端/桌面端）
+ */
 export function getStoredWallpaperMode(): WALLPAPER_MODE {
-	if (typeof window === "undefined") return backgroundWallpaper.mode;
+	if (typeof window === "undefined") return getDefaultWallpaperMode();
 
 	const isSwitchable = displaySettingsConfig.wallpaperModeSwitchable;
 	if (!isSwitchable) {
-		return backgroundWallpaper.mode;
+		return getDefaultWallpaperMode();
 	}
 
 	return (
 		(settings().get("wallpaperMode") as WALLPAPER_MODE) ||
-		backgroundWallpaper.mode
+		getDefaultWallpaperMode()
 	);
 }
 

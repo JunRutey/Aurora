@@ -1,8 +1,10 @@
 import type { BackgroundWallpaperConfig } from "@/types/backgroundWallpaper";
 
 export const backgroundWallpaper: BackgroundWallpaperConfig = {
-	// 壁纸模式："banner" 横幅壁纸，"fullscreen" 全屏壁纸，"overlay" 覆盖透明，"none" 纯色背景无壁纸
-	mode: "banner",
+	// 桌面端壁纸模式："banner" 横幅壁纸，"fullscreen" 全屏壁纸，"overlay" 覆盖透明，"none" 纯色背景无壁纸
+	mode: "fullscreen",
+	// 移动端壁纸模式，不设置则跟随 mode；新设备首次打开时生效，用户手动修改后以其为准
+	mobileMode: "banner",
 	// 是否启用背景视频播放，配置后将在导航栏显示视频播放按钮
 	playerEnable: true,
 	/**
@@ -170,12 +172,12 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 	overlay: {
 		// 层级，确保壁纸在背景层
 		zIndex: -1,
-		// 壁纸透明度
-		opacity: 0.8,
-		// 背景模糊度
-		blur: 10,
+		// 壁纸透明度，0-1之间，值越大越不透明
+		opacity: 0.9,
+		// 背景模糊度，单位px
+		blur: 1,
 		// 卡片透明度，0-1之间，值越小越透明
-		cardOpacity: 0.6,
+		cardOpacity: 0.47,
 	},
 	// 全屏壁纸模式特有配置
 	// 全屏模式下壁纸固定全屏显示，首屏居中标题，内容区在首屏之下、下滑时覆盖壁纸
