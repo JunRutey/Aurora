@@ -1,10 +1,7 @@
 ---
 /**
  * Umami 访问统计显示组件
- * 支持两种模式：
- * 1. api 模式：通过 API 获取数据，显示累计数字（需要付费计划）
- * 2. iframe 模式：嵌入 Share URL（免费计划可用）
- * 3. link 模式：显示"访问统计"链接（最简单）
+ * 支持三种模式：api / iframe / link
  */
 import { analyticsConfig } from "@/config";
 
@@ -18,30 +15,22 @@ const { style = "text", class: className } = Astro.props;
 const statsConfig = analyticsConfig?.umamiAnalytics?.stats;
 const websiteId = analyticsConfig?.umamiAnalytics?.websiteId;
 
-// 如果未启用，不渲染
-if (!statsConfig?.enabled) {
-	return null;
-}
-
-const mode = statsConfig.mode || "link";
+const mode = statsConfig?.enabled ? (statsConfig.mode || "link") : "disabled";
+const shareUrl = statsConfig?.shareUrl || "";
 
 // API 模式：获取实际数据
 let pageviews = 0;
 let visitors = 0;
 
-if (mode === "api" && statsConfig.apiKey && websiteId) {
+if (mode === "api" && statsConfig?.apiKey && websiteId) {
 	try {
 		const apiUrl = statsConfig.apiUrl || "https://api.umami.is";
 		const endAt = Date.now();
 		const startAt = 0;
-
 		const url = `${apiUrl}/api/websites/${websiteId}/stats?startAt=${startAt}&endAt=${endAt}`;
 		const response = await fetch(url, {
-			headers: {
-				"x-umami-api-key": statsConfig.apiKey,
-			},
+			headers: { "x-umami-api-key": statsConfig.apiKey },
 		});
-
 		if (response.ok) {
 			const data = await response.json();
 			pageviews = data.pageviews || 0;
@@ -52,38 +41,39 @@ if (mode === "api" && statsConfig.apiKey && websiteId) {
 	}
 }
 
-// 格式化数字
 function formatNumber(num: number): string {
 	return num.toLocaleString("zh-CN");
 }
 ---
 
-{mode === "api" && (pageviews > 0 || visitors > 0) ? (
-	<!-- API 模式：显示累计数字 -->
+{mode === "api" && (pageviews > 0 || visitors > 0) && (
 	<div class:list={["umami-stats", "umami-stats-text", className]}>
 		累计访问次数 {formatNumber(pageviews)}
 		<span class="umami-stats-divider"></span>
 		累计访客 {formatNumber(visitors)}
 	</div>
-) : mode === "iframe" && statsConfig.shareUrl ? (
-	<!-- iframe 模式：嵌入 Share URL -->
+)}
+
+{mode === "iframe" && shareUrl && (
 	<div class:list={["umami-stats", "umami-stats-iframe", className]}>
 		<iframe
-			src={statsConfig.shareUrl}
+			src={shareUrl}
 			class="umami-stats-iframe"
 			loading="lazy"
 			title="访问统计"
 		></iframe>
 	</div>
-) : mode === "link" && statsConfig.shareUrl ? (
-	<!-- link 模式：显示链接 -->
+)}
+
+{mode === "link" && shareUrl && (
 	<div class:list={["umami-stats", "umami-stats-text", className]}>
-		<a href={statsConfig.shareUrl} target="_blank" rel="noopener noreferrer" class="umami-stats-link">
+		<a href={shareUrl} target="_blank" rel="noopener noreferrer" class="umami-stats-link">
 			访问统计
 		</a>
 	</div>
-) : (
-	<!-- 未配置 -->
+)}
+
+{mode === "disabled" && (
 	<div class:list={["umami-stats", "umami-stats-text", "umami-stats-disabled", className]}>
 		访问统计
 	</div>
@@ -97,44 +87,19 @@ function formatNumber(num: number): string {
 		font-size: 0.8125rem;
 		color: var(--text-secondary, #6b7280);
 	}
-
-	.umami-stats-divider {
-		color: inherit;
-		opacity: 0.4;
-	}
-
+	.umami-stats-divider { color: inherit; opacity: 0.4; }
 	.umami-stats-link {
 		color: var(--primary, #2563eb);
 		text-decoration: none;
 		transition: opacity 0.2s;
 	}
-
-	.umami-stats-link:hover {
-		opacity: 0.8;
-		text-decoration: underline;
-	}
-
-	.umami-stats-disabled {
-		opacity: 0.5;
-		cursor: default;
-	}
-
+	.umami-stats-link:hover { opacity: 0.8; text-decoration: underline; }
+	.umami-stats-disabled { opacity: 0.5; }
 	.umami-stats-iframe {
 		width: 100%;
 		height: 200px;
 		border: none;
 		border-radius: 8px;
 		overflow: hidden;
-	}
-
-	/* Loading 动画 */
-	.umami-stats-loading {
-		opacity: 0.5;
-		animation: umami-pulse 1.5s ease-in-out infinite;
-	}
-
-	@keyframes umami-pulse {
-		0%, 100% { opacity: 0.5; }
-		50% { opacity: 1; }
 	}
 </style>
