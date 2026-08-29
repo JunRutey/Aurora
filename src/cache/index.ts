@@ -25,6 +25,7 @@ export { DEFAULT_CONFIG } from "./core";
 export { SettingsCache, getSettingsCache, getSetting, setSetting } from "./settings-cache";
 export { ContentCache, getContentCache } from "./content-cache";
 export { AssetsCache, getAssetsCache, cachedFetch } from "./assets-cache";
+export { VideoCache, getVideoCache, prefetchVideos, getCachedVideo } from "./video-cache";
 
 // 统一初始化函数，应用启动时调用一次
 import { getSettingsCache } from "./settings-cache";

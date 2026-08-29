@@ -1,6 +1,7 @@
 ---
 // 缓存系统 — Head 引导脚本
 // 在 <head> 中插入 <script is:inline>，首屏关键路径，提供 window.__cache 最小实例
+// 同时注册 Service Worker 并触发视频预缓存
 ---
 
 <script is:inline>
@@ -67,5 +68,71 @@ if (!window.__cache) {
     cachedFetch: function(url, init) { return fetch(url, init); },
     _version: "bootstrap"
   };
+}
+
+// ========== Service Worker 注册 ==========
+if ('serviceWorker' in navigator && !window.__swRegistered) {
+  window.__swRegistered = true;
+  
+  function registerSW() {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+      .then(function(reg) {
+        console.log('[Cache] SW registered');
+        
+        // SW 激活后触发视频预缓存
+        if (reg.active) {
+          prefetchVideos();
+        } else {
+          reg.addEventListener('updatefound', function() {
+            var newSW = reg.installing;
+            if (newSW) {
+              newSW.addEventListener('statechange', function() {
+                if (newSW.state === 'activated') {
+                  prefetchVideos();
+                }
+              });
+            }
+          });
+        }
+      })
+      .catch(function(err) {
+        console.warn('[Cache] SW failed:', err);
+      });
+  }
+  
+  // 页面加载后 200ms 注册 SW
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(registerSW, 200);
+    });
+  } else {
+    setTimeout(registerSW, 200);
+  }
+}
+
+// ========== 视频预缓存 ==========
+function prefetchVideos() {
+  var el = document.querySelector('[data-video-prefetch]');
+  if (!el || !('caches' in window)) return;
+  
+  var urls;
+  try {
+    urls = JSON.parse(el.getAttribute('data-video-prefetch') || '[]');
+  } catch { return; }
+  
+  if (!urls.length) return;
+  
+  var VIDEO_CACHE = "aurora-video-v1";
+  caches.open(VIDEO_CACHE).then(function(cache) {
+    urls.forEach(function(url) {
+      cache.match(url).then(function(exists) {
+        if (!exists) {
+          fetch(url).then(function(resp) {
+            if (resp.ok) cache.put(url, resp);
+          }).catch(function() {});
+        }
+      });
+    });
+  });
 }
 </script>

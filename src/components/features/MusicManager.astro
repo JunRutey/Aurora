@@ -207,27 +207,96 @@ const managerConfigStr = JSON.stringify({
     var currentTrackUrls = [];
     var currentTrackUrlIndex = 0;
     var errorSkipTimeout = null;
+    var AUDIO_CACHE = "aurora-audio-v1";
+
+    /**
+     * 从缓存获取音频 Blob URL
+     */
+    function getCachedAudioUrl(url) {
+        if (!('caches' in window)) return Promise.resolve(null);
+        return caches.open(AUDIO_CACHE).then(function(cache) {
+            return cache.match(url);
+        }).then(function(response) {
+            if (!response) return null;
+            return response.blob().then(function(blob) {
+                return URL.createObjectURL(blob);
+            });
+        }).catch(function() {
+            return null;
+        });
+    }
+
+    /**
+     * 缓存音频到 Cache API
+     */
+    function cacheAudio(url) {
+        if (!('caches' in window)) return;
+        caches.open(AUDIO_CACHE).then(function(cache) {
+            cache.match(url).then(function(exists) {
+                if (!exists) {
+                    fetch(url).then(function(resp) {
+                        if (resp.ok) cache.put(url, resp);
+                    }).catch(function() {});
+                }
+            });
+        });
+    }
 
     function tryPlayCurrentTrackUrl(autoPlay, ver) {
         if (ver !== loadVersion) return;
         var playUrl = currentTrackUrls[currentTrackUrlIndex];
-        audio.src = playUrl;
+        
+        // 先尝试从缓存获取
+        getCachedAudioUrl(playUrl).then(function(blobUrl) {
+            if (ver !== loadVersion) return;
+            
+            audio.src = blobUrl || playUrl;
+            
+            // 缓存当前音频
+            cacheAudio(playUrl);
+            
+            // 预缓存下一首
+            var nextIdx = (currentTrackUrlIndex + 1) % currentTrackUrls.length;
+            if (currentTrackUrls[nextIdx]) {
+                cacheAudio(currentTrackUrls[nextIdx]);
+            }
 
-        if (autoPlay) {
-            audio.play().then(function () {
-                if (ver !== loadVersion) return; // stale, discard
-                state.isPlaying = true;
-                state.error = null;
-                emit('fm:play-state', { isPlaying: true });
-            }).catch(function (e) {
-                if (ver !== loadVersion) return; // stale, discard
-                if (e.name === 'AbortError') return; // interrupted by new load
-                console.warn('Autoplay blocked:', e);
-            });
-        } else {
-            state.isPlaying = false;
-            emit('fm:play-state', { isPlaying: false });
-        }
+            if (autoPlay) {
+                audio.play().then(function () {
+                    if (ver !== loadVersion) return;
+                    state.isPlaying = true;
+                    state.error = null;
+                    emit('fm:play-state', { isPlaying: true });
+                }).catch(function (e) {
+                    if (ver !== loadVersion) return;
+                    if (e.name === 'AbortError') return;
+                    console.warn('Autoplay blocked:', e);
+                });
+            } else {
+                state.isPlaying = false;
+                emit('fm:play-state', { isPlaying: false });
+            }
+        }).catch(function() {
+            // 缓存失败，降级到网络
+            if (ver !== loadVersion) return;
+            audio.src = playUrl;
+            
+            if (autoPlay) {
+                audio.play().then(function () {
+                    if (ver !== loadVersion) return;
+                    state.isPlaying = true;
+                    state.error = null;
+                    emit('fm:play-state', { isPlaying: true });
+                }).catch(function (e) {
+                    if (ver !== loadVersion) return;
+                    if (e.name === 'AbortError') return;
+                    console.warn('Autoplay blocked:', e);
+                });
+            } else {
+                state.isPlaying = false;
+                emit('fm:play-state', { isPlaying: false });
+            }
+        });
     }
 
     // ── Track loading ────────────────────────────────────────
