@@ -1,11 +1,11 @@
 {
   "name": "aurora",
   "type": "module",
-  "version": "6.16.4",
+  "version": "7.0.0",
   "engines": {
-    "node": ">=22.23.0"
+    "node": ">=24.20.0"
   },
-  "packageManager": "pnpm@11.22.0",
+  "packageManager": "pnpm@11.24.0",
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
@@ -50,7 +50,7 @@
     "@tailwindcss/typography": "^0.5.20",
     "@types/hast": "^3.0.5",
     "@types/mdast": "^4.0.4",
-    "astro": "7.2.3",
+    "astro": "7.2.9",
     "astro-expressive-code": "^0.44.1",
     "astro-icon": "^1.2.0",
     "ci-info": "^4.4.0",
