@@ -340,4 +340,10 @@ export const siteConfig: SiteConfig = {
 		// 是否在页脚显示访问统计链接
 		enabled: true,
 	},
+
+	// 不蒜子统计配置
+	busuanzi: {
+		// 是否启用不蒜子统计
+		enabled: true,
+	},
 };

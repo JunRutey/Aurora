@@ -21,6 +21,9 @@ const { class: className, style, widgetConfig } = Astro.props;
 
 const showTitle = widgetConfig?.showTitle !== false;
 
+// 不蒜子统计配置
+const enableBusuanzi = siteConfig.busuanzi?.enabled ?? false;
+
 // 从配置中获取站点开始日期
 const siteStartDate = siteConfig.siteStartDate || "2025-01-01";
 
@@ -139,7 +142,46 @@ const stats = [
       </div>
     ))}
   </div>
+  
+  {/* 不蒜子访问统计 */}
+  {enableBusuanzi && (
+    <div class="flex flex-col gap-2 mt-2 pt-2 border-t border-neutral-200 dark:border-neutral-700">
+      <div class="flex items-center justify-between px-3 py-1.5">
+        <div class="flex items-center gap-2.5">
+          <div class="text-(--primary) text-xl">
+            <Icon name="material-symbols:visibility-outline" />
+          </div>
+          <span class="text-neutral-700 dark:text-neutral-300 font-medium text-sm">
+            {i18n(I18nKey.siteStatsTotalViews)}
+          </span>
+        </div>
+        <div class="flex items-center">
+          <span id="busuanzi_value_site_pv" class="text-base font-bold text-neutral-900 dark:text-neutral-100">--</span>
+          <span class="ml-1 text-sm text-neutral-500 dark:text-neutral-400">次</span>
+        </div>
+      </div>
+      <div class="flex items-center justify-between px-3 py-1.5">
+        <div class="flex items-center gap-2.5">
+          <div class="text-(--primary) text-xl">
+            <Icon name="material-symbols:group-outline" />
+          </div>
+          <span class="text-neutral-700 dark:text-neutral-300 font-medium text-sm">
+            {i18n(I18nKey.siteStatsTotalVisitors)}
+          </span>
+        </div>
+        <div class="flex items-center">
+          <span id="busuanzi_value_site_uv" class="text-base font-bold text-neutral-900 dark:text-neutral-100">--</span>
+          <span class="ml-1 text-sm text-neutral-500 dark:text-neutral-400">人</span>
+        </div>
+      </div>
+    </div>
+  )}
 </WidgetLayout>
+
+{/* 不蒜子脚本 */}
+{enableBusuanzi && (
+  <script is:inline async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+)}
 
 <script is:inline define:vars={{ siteStartDate, lastPostDate, todayText }}>
   function updateDynamicStats() {

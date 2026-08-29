@@ -405,6 +405,8 @@ enum I18nKey {
 	siteStatsLastUpdate = "siteStatsLastUpdate",
 	siteStatsDaysAgo = "siteStatsDaysAgo",
 	siteStatsDays = "siteStatsDays",
+	siteStatsTotalViews = "siteStatsTotalViews",
+	siteStatsTotalVisitors = "siteStatsTotalVisitors",
 	today = "today",
 
 	// 站点信息
