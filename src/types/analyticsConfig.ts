@@ -17,9 +17,10 @@ export type AnalyticsConfig = {
 		// 访问统计显示配置
 		stats?: {
 			enabled?: boolean; // 是否启用访问统计显示
-			fetchMode?: "build" | "client"; // 数据获取方式
-			apiUrl?: string; // Umami Cloud API 地址
-			apiKey?: string; // Umami API Key（不要提交到公开仓库）
+			mode?: "api" | "iframe"; // 显示方式
+			shareUrl?: string; // Umami Cloud Share URL（iframe 模式）
+			apiUrl?: string; // Umami Cloud API 地址（api 模式）
+			apiKey?: string; // Umami API Key（api 模式，需要付费计划）
 		};
 	};
 	la51Analytics?: {

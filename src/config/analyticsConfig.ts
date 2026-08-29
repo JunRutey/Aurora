@@ -34,12 +34,16 @@ export const analyticsConfig: AnalyticsConfig = {
 		stats: {
 			// 是否启用访问统计显示
 			enabled: true,
-			// 数据获取方式："build"=构建时获取 | "client"=客户端获取（需代理）
-			fetchMode: "build",
-			// Umami Cloud API 地址（仅 fetchMode 为 "build" 时使用）
+			// 显示方式：
+			// - "link": 显示"访问统计"链接（免费计划推荐）
+			// - "iframe": 嵌入 Share URL（免费计划可用，会显示完整仪表板）
+			// - "api": 通过 API 获取数据并显示数字（需要付费计划）
+			mode: "link",
+			// Umami Cloud Share URL（link 和 iframe 模式使用）
+			shareUrl: "https://cloud.umami.is/share/Qpo5oYVQZZZsodHO",
+			// Umami Cloud API 地址（api 模式使用）
 			apiUrl: "https://api.umami.is",
-			// Umami API Key（仅 fetchMode 为 "build" 时使用，不要提交到公开仓库！）
-			// 环境变量: UMAMI_API_KEY
+			// Umami API Key（api 模式使用，需要付费计划）
 			apiKey: "",
 		},
 	},
