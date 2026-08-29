@@ -184,8 +184,8 @@ function sanitizeForJS(str) {
   return String(str)
     .replace(/\\/g, "\\\\")
     .replace(/'/g, "\\'")
-    .replace(/\n/g, "\n")
-    .replace(/\r/g, "\r")
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r")
     .replace(/</g, "\\x3c")
     .replace(/>/g, "\\x3e");
 }
