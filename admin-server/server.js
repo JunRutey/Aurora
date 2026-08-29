@@ -10,6 +10,8 @@ const PROJECT_ROOT = path.resolve(__dirname, "..");
 const POSTS_DIR = path.join(PROJECT_ROOT, "src", "content", "posts");
 const IMAGES_DIR = path.join(PROJECT_ROOT, "src", "assets", "images");
 const PUBLIC_IMAGES_DIR = path.join(PROJECT_ROOT, "public", "assets", "images");
+const GALLERY_DIR = path.join(PROJECT_ROOT, "public", "gallery");
+const GALLERY_CONFIG_FILE = path.join(PROJECT_ROOT, "src", "config", "galleryConfig.ts");
 const STAGING_FILE = path.join(__dirname, ".staging.json");
 const git = simpleGit(PROJECT_ROOT);
 let currentBranch = "main";
@@ -33,6 +35,30 @@ var storage = multer.diskStorage({
 });
 var upload = multer({
   storage: storage,
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: function(req, file, cb) {
+    cb(/^image\/(jpeg|png|gif|webp|avif|svg\+xml)$/.test(file.mimetype) ? null : new Error("只允许上传图片文件"), true);
+  }
+});
+
+// ── Gallery 图片上传 ──
+var galleryStorage = multer.diskStorage({
+  destination: function(req, file, cb) {
+    var albumId = req.params.id;
+    if (!albumId || !validateAlbumId(albumId)) return cb(new Error("无效的相册 ID"));
+    var albumDir = path.join(GALLERY_DIR, albumId);
+    if (!fs.existsSync(albumDir)) fs.mkdirSync(albumDir, { recursive: true });
+    cb(null, albumDir);
+  },
+  filename: function(req, file, cb) {
+    var ext = path.extname(file.originalname);
+    var base = path.basename(file.originalname, ext)
+      .toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff_-]/g, "-").replace(/-+/g, "-");
+    cb(null, base + "-" + Date.now() + ext);
+  }
+});
+var galleryUpload = multer({
+  storage: galleryStorage,
   limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: function(req, file, cb) {
     cb(/^image\/(jpeg|png|gif|webp|avif|svg\+xml)$/.test(file.mimetype) ? null : new Error("只允许上传图片文件"), true);
@@ -312,6 +338,116 @@ function isStaged(slug) {
   return loadStaging().some(function(s) { return s.slug === slug; });
 }
 
+// ── Gallery 配置解析 ──
+function validateAlbumId(id) {
+  if (!id || typeof id !== "string") return false;
+  if (/\.\./.test(id) || /\0/.test(id)) return false;
+  return /^[a-zA-Z0-9_-]+$/.test(id);
+}
+
+function parseGalleryConfig() {
+  if (!fs.existsSync(GALLERY_CONFIG_FILE)) return { albums: [], columnWidth: 240 };
+  var content = fs.readFileSync(GALLERY_CONFIG_FILE, "utf-8");
+  var result = { albums: [], columnWidth: 240 };
+
+  // columnWidth
+  var cwM = content.match(/columnWidth\s*:\s*(\d+)/);
+  if (cwM) result.columnWidth = parseInt(cwM[1], 10);
+
+  // albums 数组
+  var aIdx = content.indexOf("albums");
+  if (aIdx === -1) return result;
+  var bStart = content.indexOf("[", aIdx);
+  if (bStart === -1) return result;
+  var depth = 0, bEnd = -1;
+  for (var i = bStart; i < content.length; i++) {
+    if (content[i] === "[") depth++;
+    if (content[i] === "]") { depth--; if (depth === 0) { bEnd = i; break; } }
+  }
+  if (bEnd === -1) return result;
+  var inner = content.substring(bStart + 1, bEnd);
+
+  // 提取 { } 对象
+  var objs = [], oStart = -1;
+  depth = 0;
+  for (var i = 0; i < inner.length; i++) {
+    if (inner[i] === "{") { if (depth === 0) oStart = i; depth++; }
+    if (inner[i] === "}") {
+      depth--;
+      if (depth === 0 && oStart >= 0) { objs.push(inner.substring(oStart + 1, i)); oStart = -1; }
+    }
+  }
+
+  result.albums = objs.map(function(t) {
+    var a = {};
+    var m;
+    if ((m = t.match(/id\s*:\s*["'`](.*?)["'`]/))) a.id = m[1];
+    if ((m = t.match(/name\s*:\s*["'`](.*?)["'`]/))) a.name = m[1];
+    if ((m = t.match(/cover\s*:\s*["'`](.*?)["'`]/))) a.cover = m[1];
+    if ((m = t.match(/date\s*:\s*["'`](.*?)["'`]/))) a.date = m[1];
+    if ((m = t.match(/location\s*:\s*["'`](.*?)["'`]/))) a.location = m[1];
+    if ((m = t.match(/password\s*:\s*["'`](.*?)["'`]/))) a.password = m[1];
+    if ((m = t.match(/passwordHint\s*:\s*["'`](.*?)["'`]/))) a.passwordHint = m[1];
+    if ((m = t.match(/description\s*:\s*["'`]([\s\S]*?)["'`]/))) a.description = m[1].trim();
+    if ((m = t.match(/tags\s*:\s*\[([^\]]*)\]/))) {
+      a.tags = (m[1].match(/["'`](.*?)["'`]/g) || []).map(function(s) { return s.slice(1, -1); });
+    }
+    return a;
+  });
+
+  return result;
+}
+
+function serializeGalleryConfig(config) {
+  var lines = [];
+  lines.push('import type { GalleryConfig } from "@/types/galleryConfig";');
+  lines.push('');
+  lines.push('// 相册配置');
+  lines.push('export const galleryConfig: GalleryConfig = {');
+  lines.push('	// 相册列表');
+  lines.push('	albums: [');
+  (config.albums || []).forEach(function(album) {
+    lines.push('		{');
+    lines.push('			id: "' + (album.id || '') + '",');
+    lines.push('			name: "' + (album.name || '') + '",');
+    if (album.description) lines.push('			description: "' + album.description + '",');
+    if (album.location) lines.push('			location: "' + album.location + '",');
+    if (album.date) lines.push('			date: "' + album.date + '",');
+    if (album.tags && album.tags.length) {
+      lines.push('			tags: [' + album.tags.map(function(t) { return '"' + t + '"'; }).join(', ') + '],');
+    }
+    if (album.cover) lines.push('			cover: "' + album.cover + '",');
+    if (album.password) lines.push('			password: "' + album.password + '",');
+    if (album.passwordHint) lines.push('			passwordHint: "' + album.passwordHint + '",');
+    lines.push('		},');
+  });
+  lines.push('	],');
+  lines.push('');
+  lines.push('	// 瀑布流最小列宽(px)，浏览器根据容器宽度自动计算列数，默认 240');
+  lines.push('	columnWidth: ' + (config.columnWidth || 240) + ',');
+  lines.push('};');
+  lines.push('');
+  return lines.join('\n');
+}
+
+function getAlbumPhotos(albumId) {
+  var albumDir = path.join(GALLERY_DIR, albumId);
+  if (!fs.existsSync(albumDir)) return [];
+  return fs.readdirSync(albumDir)
+    .filter(function(f) { return /\.(jpe?g|png|gif|webp|avif|svg)$/i.test(f); })
+    .map(function(f) {
+      var stat = fs.statSync(path.join(albumDir, f));
+      return { name: f, size: stat.size, path: "/gallery/" + albumId + "/" + f, modified: stat.mtime.toISOString() };
+    })
+    .sort(function(a, b) { return new Date(b.modified) - new Date(a.modified); });
+}
+
+function getAlbumPhotoCount(albumId) {
+  var albumDir = path.join(GALLERY_DIR, albumId);
+  if (!fs.existsSync(albumDir)) return 0;
+  return fs.readdirSync(albumDir).filter(function(f) { return /\.(jpe?g|png|gif|webp|avif|svg)$/i.test(f); }).length;
+}
+
 // ── SVG Icons ──
 var icDoc = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>';
 var icFolder = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
@@ -434,6 +570,7 @@ app.get("/", function(req, res) {
     body += '<div class="dashboard-side">';
     body += '<div class="widget"><div class="widget-header">快捷操作</div><div class="widget-body">';
     body += '<a href="/new" class="widget-link">' + icEdit + ' 新建文章</a>';
+    body += '<a href="/gallery-admin" class="widget-link">' + icEdit + ' 📸 相册管理</a>';
     body += '<a href="/" class="widget-link">' + icRefresh + ' 刷新列表</a>';
     body += '<a href="/staging" class="widget-link">' + icInbox + ' 暂存列表' + (stagedCount > 0 ? ' <span style="background:#f59e0b;color:#fff;font-size:11px;padding:1px 6px;border-radius:8px;margin-left:auto">' + stagedCount + '</span>' : '') + '</a>';
     body += '</div></div>';
@@ -511,6 +648,172 @@ app.get("/staging", function(req, res) {
     res.status(500).send(wrapHTML("错误", '<div class="container"><h1>错误</h1><pre>' + esc(e.message) + '</pre></div>'));
   }
 });
+
+// ── Gallery 管理列表页 ──
+app.get("/gallery-admin", function(req, res) {
+  try {
+    var config = parseGalleryConfig();
+    var albums = config.albums.map(function(album) {
+      var photoCount = getAlbumPhotoCount(album.id);
+      return { id: album.id, name: album.name, description: album.description || "", date: album.date || "", location: album.location || "", tags: album.tags || [], cover: album.cover || "", password: album.password || "", photoCount: photoCount };
+    });
+
+    var totalPhotos = albums.reduce(function(s, a) { return s + a.photoCount; }, 0);
+
+    var body = '';
+    body += '<div style="max-width:1100px;margin:0 auto;padding:24px 20px 0">';
+    body += '<header style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">';
+    body += '<h1 style="font-size:20px;font-weight:600;display:flex;align-items:center;gap:8px">📸 相册管理<span style="color:#94a3b8;font-weight:400;font-size:14px;margin-left:4px">' + albums.length + ' 个相册</span></h1>';
+    body += '<div style="display:flex;gap:8px"><a href="/" class="btn btn-ghost btn-sm">🏠 后台首页</a><a href="/gallery-admin/new" class="btn btn-primary">+ 新建相册</a></div>';
+    body += '</header>';
+    body += '<div class="stats-summary">';
+    body += '<div class="stat-chip">📷 <strong>' + albums.length + '</strong> 个相册</div>';
+    body += '<div class="stat-chip">🖼️ <strong>' + totalPhotos + '</strong> 张图片</div>';
+    body += '</div></div>';
+
+    body += '<div class="container">';
+    if (albums.length === 0) {
+      body += '<div class="empty" style="background:#fff;border-radius:10px;border:1px solid #e8e8e8"><p>还没有相册</p><a href="/gallery-admin/new" class="btn btn-primary">创建第一个相册</a></div>';
+    } else {
+      body += '<div style="background:#fff;border-radius:10px;border:1px solid #e8e8e8;overflow:hidden">';
+      body += '<table class="post-table"><thead><tr><th>相册</th><th>日期</th><th>标签</th><th>图片</th><th>操作</th></tr></thead><tbody>';
+      albums.forEach(function(a) {
+        var tags = a.tags.map(function(t) { return '<span class="tag">' + esc(t) + '</span>'; }).join("");
+        var badges = [];
+        if (a.password) badges.push('<span class="draft-badge">🔒 加密</span>');
+        body += '<tr>';
+        body += '<td><a href="/gallery-admin/edit?id=' + encodeURIComponent(a.id) + '">' + esc(a.name) + '</a> ' + badges.join(" ") + ' <span style="color:#94a3b8;font-size:12px">' + esc(a.id) + '</span></td>';
+        body += '<td>' + esc(a.date || '-') + '</td>';
+        body += '<td>' + (tags || '<span style="color:#cbd5e1">-</span>') + '</td>';
+        body += '<td>' + a.photoCount + ' 张</td>';
+        body += '<td class="actions">';
+        body += '<a href="/gallery-admin/edit?id=' + encodeURIComponent(a.id) + '" class="btn btn-ghost btn-sm">编辑</a>';
+        body += '<button class="btn btn-danger btn-sm" onclick="deleteAlbum(\'' + escJS(a.id) + '\',\'' + escJS(a.name) + '\')">删除</button>';
+        body += '</td></tr>';
+      });
+      body += '</tbody></table></div>';
+    }
+    body += '</div>';
+
+    body += '<script>';
+    body += 'function deleteAlbum(id,name){if(!confirm("确定删除相册「"+name+"」？\
+\
+这将同时删除相册目录和所有图片，且无法恢复！"))return;var btn=event.target;setLoading(btn,true);fetch("/api/gallery/"+encodeURIComponent(id),{method:"DELETE"}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast(j.message,"success");setTimeout(function(){location.reload()},800)}else{showToast(j.error||"删除失败","error");setLoading(btn,false)}}).catch(function(){showToast("网络错误","error");setLoading(btn,false)})}';
+    body += '</script>';
+
+    res.send(wrapHTML("相册管理", body));
+  } catch (e) {
+    res.status(500).send(wrapHTML("错误", '<div class="container"><h1>错误</h1><pre>' + esc(e.message) + '</pre></div>'));
+  }
+});
+
+// ── Gallery 新建/编辑表单页 ──
+app.get("/gallery-admin/new", function(req, res) { serveGalleryEditor(null, res); });
+app.get("/gallery-admin/edit", function(req, res) {
+  var albumId = req.query.id;
+  if (!albumId) return res.redirect("/gallery-admin");
+  if (!validateAlbumId(albumId)) return res.status(400).send(wrapHTML("错误", '<div class="container"><h1>无效的相册 ID</h1><a href="/gallery-admin" class="btn btn-ghost">← 返回列表</a></div>'));
+  serveGalleryEditor(albumId, res);
+});
+
+function serveGalleryEditor(albumId, res) {
+  var config = parseGalleryConfig();
+  var album = null;
+  var isNew = true;
+
+  if (albumId) {
+    for (var i = 0; i < config.albums.length; i++) {
+      if (config.albums[i].id === albumId) { album = config.albums[i]; break; }
+    }
+    if (!album) return res.redirect("/gallery-admin");
+    isNew = false;
+  }
+
+  var formTitle = isNew ? "新建相册" : "编辑: " + (album.name || albumId);
+  var data = album || { id: "", name: "", description: "", date: "", location: "", tags: [], cover: "", password: "", passwordHint: "" };
+  var safeIdForJS = escJS(albumId || "");
+
+  var body = '<div class="container"><header><h1>' + esc(formTitle) + '</h1><a href="/gallery-admin" class="btn btn-ghost">← 返回列表</a></header>';
+  body += '<form id="galleryForm"><div class="form-grid">';
+
+  // ID
+  body += '<div class="form-group"><label>相册 ID *</label><input type="text" name="id" value="' + esc(data.id || "") + '" required placeholder="如: japan-2025"' + (albumId ? ' readonly style="background:#f1f5f9"' : '') + '><span class="help-text">只能包含字母、数字、连字符和下划线，作为目录名</span></div>';
+  // Name
+  body += '<div class="form-group"><label>相册名称 *</label><input type="text" name="name" value="' + esc(data.name || "") + '" required placeholder="相册显示名称"></div>';
+  // Description
+  body += '<div class="form-group full"><label>描述</label><textarea name="description" style="min-height:80px" placeholder="相册描述">' + esc(data.description || "") + '</textarea></div>';
+  // Date
+  body += '<div class="form-group"><label>日期</label><input type="date" name="date" value="' + esc(data.date || "") + '"></div>';
+  // Location
+  body += '<div class="form-group"><label>拍摄地点</label><input type="text" name="location" value="' + esc(data.location || "") + '" placeholder="如：日本东京"></div>';
+  // Tags
+  body += '<div class="form-group"><label>标签（逗号分隔）</label><input type="text" name="tags" value="' + esc((data.tags || []).join(", ")) + '" placeholder="风景, 旅行, 日本"></div>';
+  // Cover
+  body += '<div class="form-group"><label>封面图</label><input type="text" name="cover" value="' + esc(data.cover || "") + '" placeholder="留空自动选择"><span class="help-text">可填 cover.jpg 或图片文件名，留空则用第一张图</span></div>';
+  // Password
+  body += '<div class="form-group"><label>访问密码</label><input type="text" name="password" value="' + esc(data.password || "") + '" placeholder="留空不加密"></div>';
+  // Password Hint
+  body += '<div class="form-group"><label>密码提示</label><input type="text" name="passwordHint" value="' + esc(data.passwordHint || "") + '"></div>';
+  body += '</div>'; // form-grid
+
+  // 操作按钮
+  body += '<div class="form-actions">';
+  body += '<button type="submit" class="btn btn-primary" id="saveBtn">保存</button>';
+  body += '<a href="/gallery-admin" class="btn btn-ghost">取消</a>';
+  body += '</div>';
+  body += '</form>';
+
+  // ── 照片管理（仅编辑模式）──
+  if (!isNew) {
+    body += '<div style="margin-top:32px;border-top:1px solid #e2e8f0;padding-top:24px">';
+    body += '<h2 style="font-size:16px;font-weight:600;margin-bottom:16px">📷 照片管理 <span style="color:#94a3b8;font-weight:400;font-size:13px" id="photoCountBadge"></span></h2>';
+
+    // 上传区域
+    body += '<div class="upload-zone" id="galleryUploadZone" onclick="document.getElementById(\'galleryFileInput\').click()" style="margin-bottom:16px">';
+    body += '<input type="file" id="galleryFileInput" accept="image/*" multiple>';
+    body += '<div id="galleryUploadHint">点击或拖拽图片到此处上传到相册<br><span style="font-size:12px">支持多选，JPG / PNG / GIF / WebP / AVIF / SVG，最大 20MB</span></div>';
+    body += '</div>';
+
+    // URLs.txt 远程图片
+    body += '<div class="form-group" style="margin-bottom:16px"><label>远程图片 URL（每行一个）</label>';
+    body += '<textarea id="urlsTextarea" style="min-height:100px;font-family:\'JetBrains Mono\',monospace;font-size:13px" placeholder="https://example.com/photo1.jpg&#10;https://example.com/photo2.png"></textarea>';
+    body += '<div style="display:flex;gap:8px;margin-top:6px"><button type="button" class="btn btn-ghost btn-sm" onclick="saveUrls()">保存 URL 列表</button><span class="help-text" style="display:flex;align-items:center">每行一个 URL，前端会读取 urls.txt 加载远程图片</span></div>';
+    body += '</div>';
+
+    // 照片网格
+    body += '<div id="photoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:16px"></div>';
+
+    body += '</div>';
+  }
+
+  body += '</div>'; // container
+
+  // ── JavaScript ──
+  body += '<script>';
+  if (!isNew) {
+    body += 'var albumId="' + safeIdForJS + '";';
+    body += 'function loadPhotos(){fetch("/api/gallery/"+encodeURIComponent(albumId)+"/photos").then(function(r){return r.json()}).then(function(j){if(!j.ok)return;var grid=document.getElementById("photoGrid");var badge=document.getElementById("photoCountBadge");badge.textContent="("+j.photos.length+" 张本地图片)";if(j.photos.length===0){grid.innerHTML="<p style=\\"color:#94a3b8;grid-column:1/-1;text-align:center;padding:20px\\">暂无本地图片</p>";return}grid.innerHTML=j.photos.map(function(p){return "<div style=\\"background:#f8fafc;border:1px solid #e8e8e8;border-radius:8px;overflow:hidden;position:relative\\">"+ "<div style=\\"height:140px;overflow:hidden;background:#f1f5f9;display:flex;align-items:center;justify-content:center\\">"+ "<img src=\\""+esc(p.path)+"\\" style=\\"width:100%;height:100%;object-fit:cover\\" onerror=\\"this.style.display=none\\">"+ "</div>"+ "<div style=\\"padding:8px 10px;font-size:12px\\">"+ "<div style=\\"color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap\\">"+esc(p.name)+"</div>"+ "<div style=\\"color:#94a3b8;font-size:11px\\">"+esc(p.size)+"</div>"+ "</div>"+ "<button onclick=\\"deletePhoto(\\\\""+escJS(p.name)+"\\\\")\\" style=\\"position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;border:none;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;line-height:1\\" title=\\"删除\\">×</button>"+ "</div>";}).join("");}).catch(function(e){console.error(e)})}';
+    body += 'function deletePhoto(name){if(!confirm("确定删除图片 "+name+" ?"))return;fetch("/api/gallery/"+encodeURIComponent(albumId)+"/photo?name="+encodeURIComponent(name),{method:"DELETE"}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast(j.message,"success");loadPhotos()}else{showToast(j.error||"删除失败","error")}}).catch(function(){showToast("网络错误","error")})}';
+    body += 'function saveUrls(){var text=document.getElementById("urlsTextarea").value;var urls=text.split("\
+").map(function(l){return l.trim()}).filter(Boolean);fetch("/api/gallery/"+encodeURIComponent(albumId)+"/urls",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({urls:urls})}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("URL 列表已保存","success")}else{showToast(j.error||"保存失败","error")}}).catch(function(){showToast("网络错误","error")})}';
+    body += '(function(){loadPhotos();fetch("/api/gallery/"+encodeURIComponent(albumId)+"/photos").then(function(r){return r.json()}).then(function(j){if(j.ok&&j.urls){document.getElementById("urlsTextarea").value=j.urls.join("\n")}})})();';
+    // 上传
+    body += '(function(){var uz=document.getElementById("galleryUploadZone");var fi=document.getElementById("galleryFileInput");uz.addEventListener("dragover",function(e){e.preventDefault();uz.classList.add("dragover")});uz.addEventListener("dragleave",function(){uz.classList.remove("dragover")});uz.addEventListener("drop",function(e){e.preventDefault();uz.classList.remove("dragover");if(e.dataTransfer.files.length)uploadGalleryFiles(e.dataTransfer.files)});fi.addEventListener("change",function(){if(fi.files.length)uploadGalleryFiles(fi.files);fi.value=""});function uploadGalleryFiles(files){var fd=new FormData();for(var i=0;i<files.length;i++)fd.append("files",files[i]);var hint=document.getElementById("galleryUploadHint");hint.textContent="上传中...";fetch("/api/gallery/"+encodeURIComponent(albumId)+"/upload",{method:"POST",body:fd}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("\\u2705 "+j.message,"success");loadPhotos();hint.innerHTML="上传成功！继续拖拽图片到此处可继续上传<br><span style=\\"font-size:12px\\">支持多选，JPG / PNG / GIF / WebP / AVIF / SVG，最大 20MB</span>"}else{showToast("\\u274c "+(j.error||"上传失败"),"error");hint.innerHTML="点击或拖拽图片到此处上传到相册<br><span style=\\"font-size:12px\\">支持多选，JPG / PNG / GIF / WebP / AVIF / SVG，最大 20MB</span>"}}).catch(function(){showToast("\\u274c 网络错误","error")})}})();';
+  }
+  // 表单提交
+  body += 'document.getElementById("galleryForm").addEventListener("submit",function(e){';
+  body += 'e.preventDefault();var submitBtn=e.submitter;setLoading(submitBtn,true);';
+  body += 'var fd=new FormData(e.target);';
+  body += 'var b={id:fd.get("id"),name:fd.get("name"),description:fd.get("description"),date:fd.get("date"),location:fd.get("location"),tags:fd.get("tags"),cover:fd.get("cover"),password:fd.get("password"),passwordHint:fd.get("passwordHint")};';
+  body += 'fetch("/api/gallery",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)})';
+  body += '.then(function(r){return r.json()}).then(function(j){';
+  body += 'if(j.ok){showToast("\\u2705 "+j.message,"success",3000);setTimeout(function(){location.href="/gallery-admin/edit?id="+encodeURIComponent(j.id)},800)}';
+  body += 'else{showToast("\\u274c "+(j.error||"保存失败"),"error",5000);setLoading(submitBtn,false)}}';
+  body += ').catch(function(){showToast("\\u274c 网络错误","error");setLoading(submitBtn,false)})});';
+  body += '</script>';
+
+  res.send(wrapHTML(formTitle, body));
+}
 
 // ── 编辑/新建页 ──
 app.get("/new", function(req, res) { serveEditor(null, res); });
@@ -987,6 +1290,211 @@ app.post("/api/staging/remove", function(req, res) {
     if (!validateSlug(slug)) return res.json({ ok: false, error: "无效的 slug" });
     removeFromStaging(slug);
     res.json({ ok: true, message: "已从暂存列表移除" });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════
+// ── Gallery API ──
+// ══════════════════════════════════════════════
+
+// ── API: 获取相册列表 ──
+app.get("/api/gallery", function(req, res) {
+  try {
+    var config = parseGalleryConfig();
+    var albums = config.albums.map(function(album) {
+      var photos = getAlbumPhotos(album.id);
+      var totalSize = photos.reduce(function(s, p) { return s + p.size; }, 0);
+      return {
+        id: album.id,
+        name: album.name,
+        description: album.description || "",
+        date: album.date || "",
+        location: album.location || "",
+        tags: album.tags || [],
+        cover: album.cover || "",
+        password: album.password || "",
+        passwordHint: album.passwordHint || "",
+        photoCount: photos.length,
+        totalSize: formatBytes(totalSize)
+      };
+    });
+    res.json({ ok: true, albums: albums, columnWidth: config.columnWidth || 240 });
+  } catch (e) {
+    res.json({ ok: false, error: e.message, albums: [] });
+  }
+});
+
+// ── API: 创建/更新相册 ──
+app.post("/api/gallery", rateLimit(30, 60000), async function(req, res) {
+  try {
+    var body = req.body;
+    var albumId = (body.id || "").trim();
+    var albumName = (body.name || "").trim();
+
+    if (!albumId) return res.json({ ok: false, error: "请填写相册 ID" });
+    if (!validateAlbumId(albumId)) return res.json({ ok: false, error: "相册 ID 只能包含字母、数字、连字符和下划线" });
+    if (!albumName) return res.json({ ok: false, error: "请填写相册名称" });
+
+    var config = parseGalleryConfig();
+    var existIdx = -1;
+    for (var i = 0; i < config.albums.length; i++) {
+      if (config.albums[i].id === albumId) { existIdx = i; break; }
+    }
+
+    var tags = typeof body.tags === "string"
+      ? body.tags.split(",").map(function(t) { return t.trim(); }).filter(Boolean)
+      : (body.tags || []);
+
+    var album = {
+      id: albumId,
+      name: albumName,
+      description: body.description || "",
+      date: body.date || "",
+      location: body.location || "",
+      tags: tags,
+      cover: body.cover || "",
+      password: body.password || "",
+      passwordHint: body.passwordHint || ""
+    };
+
+    if (existIdx >= 0) {
+      config.albums[existIdx] = album;
+    } else {
+      config.albums.push(album);
+    }
+
+    // 确保目录存在
+    var albumDir = path.join(GALLERY_DIR, albumId);
+    if (!fs.existsSync(albumDir)) fs.mkdirSync(albumDir, { recursive: true });
+
+    // 写入配置
+    fs.writeFileSync(GALLERY_CONFIG_FILE, serializeGalleryConfig(config), "utf-8");
+
+    var msg = existIdx >= 0 ? "相册「" + albumName + "」已更新" : "相册「" + albumName + "」已创建";
+    res.json({ ok: true, message: msg, id: albumId });
+  } catch (e) {
+    console.error("Gallery save error:", e);
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// ── API: 删除相册 ──
+app.delete("/api/gallery/:id", rateLimit(30, 60000), async function(req, res) {
+  try {
+    var albumId = req.params.id;
+    if (!validateAlbumId(albumId)) return res.json({ ok: false, error: "无效的相册 ID" });
+
+    var config = parseGalleryConfig();
+    var existIdx = -1;
+    for (var i = 0; i < config.albums.length; i++) {
+      if (config.albums[i].id === albumId) { existIdx = i; break; }
+    }
+    if (existIdx === -1) return res.json({ ok: false, error: "相册不存在" });
+
+    var albumName = config.albums[existIdx].name;
+
+    // 从配置中移除
+    config.albums.splice(existIdx, 1);
+    fs.writeFileSync(GALLERY_CONFIG_FILE, serializeGalleryConfig(config), "utf-8");
+
+    // 删除目录
+    var albumDir = path.join(GALLERY_DIR, albumId);
+    if (fs.existsSync(albumDir)) {
+      fs.rmSync(albumDir, { recursive: true, force: true });
+    }
+
+    // Git 提交
+    await git.add(".");
+    await git.commit("🗑️ 删除相册: " + albumName);
+    await git.push("origin", currentBranch);
+
+    res.json({ ok: true, message: "相册「" + albumName + "」已删除" });
+  } catch (e) {
+    console.error("Gallery delete error:", e);
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// ── API: 上传相册图片 ──
+app.post("/api/gallery/:id/upload", rateLimit(30, 60000), function(req, res) {
+  galleryUpload.array("files", 50)(req, res, function(err) {
+    if (err) return res.json({ ok: false, error: err.message || "上传失败" });
+    if (!req.files || req.files.length === 0) return res.json({ ok: false, error: "未选择文件" });
+    var results = req.files.map(function(f) {
+      return { name: f.filename, size: formatBytes(f.size), path: "/gallery/" + req.params.id + "/" + f.filename };
+    });
+    res.json({ ok: true, message: "成功上传 " + results.length + " 张图片", files: results });
+  });
+});
+
+// ── API: 获取相册图片列表 ──
+app.get("/api/gallery/:id/photos", function(req, res) {
+  try {
+    var albumId = req.params.id;
+    if (!validateAlbumId(albumId)) return res.json({ ok: false, error: "无效的相册 ID" });
+
+    var albumDir = path.join(GALLERY_DIR, albumId);
+    var photos = [];
+    if (fs.existsSync(albumDir)) {
+      photos = getAlbumPhotos(albumId).map(function(p) {
+        return { name: p.name, size: formatBytes(p.size), path: p.path, modified: p.modified };
+      });
+    }
+
+    // 读取 urls.txt
+    var urlsFile = path.join(albumDir, "urls.txt");
+    var urls = [];
+    if (fs.existsSync(urlsFile)) {
+      urls = fs.readFileSync(urlsFile, "utf-8").split("\n").map(function(l) { return l.trim(); }).filter(Boolean);
+    }
+
+    res.json({ ok: true, photos: photos, urls: urls });
+  } catch (e) {
+    res.json({ ok: false, error: e.message, photos: [] });
+  }
+});
+
+// ── API: 删除相册图片 ──
+app.delete("/api/gallery/:id/photo", rateLimit(30, 60000), function(req, res) {
+  try {
+    var albumId = req.params.id;
+    var photoName = req.query.name;
+    if (!validateAlbumId(albumId)) return res.json({ ok: false, error: "无效的相册 ID" });
+    if (!photoName) return res.json({ ok: false, error: "请指定要删除的图片" });
+
+    // 防路径穿越
+    if (photoName.indexOf("..") >= 0 || photoName.indexOf("/") >= 0 || photoName.indexOf("\\") >= 0) {
+      return res.json({ ok: false, error: "无效的文件名" });
+    }
+
+    var photoPath = path.join(GALLERY_DIR, albumId, photoName);
+    var albumDir = path.join(GALLERY_DIR, albumId);
+    if (!isPathContained(photoPath, albumDir)) return res.json({ ok: false, error: "路径不安全" });
+    if (!fs.existsSync(photoPath)) return res.json({ ok: false, error: "文件不存在" });
+
+    fs.unlinkSync(photoPath);
+    res.json({ ok: true, message: "图片「" + photoName + "」已删除" });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// ── API: 保存远程图片 URL 列表 ──
+app.post("/api/gallery/:id/urls", rateLimit(30, 60000), function(req, res) {
+  try {
+    var albumId = req.params.id;
+    if (!validateAlbumId(albumId)) return res.json({ ok: false, error: "无效的相册 ID" });
+
+    var albumDir = path.join(GALLERY_DIR, albumId);
+    if (!fs.existsSync(albumDir)) fs.mkdirSync(albumDir, { recursive: true });
+
+    var urls = (req.body.urls || []).map(function(u) { return String(u).trim(); }).filter(Boolean);
+    var urlsFile = path.join(albumDir, "urls.txt");
+    fs.writeFileSync(urlsFile, urls.join("\n"), "utf-8");
+
+    res.json({ ok: true, message: "URL 列表已保存（" + urls.length + " 条）" });
   } catch (e) {
     res.json({ ok: false, error: e.message });
   }
