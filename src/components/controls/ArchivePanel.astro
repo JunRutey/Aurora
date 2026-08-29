@@ -4,6 +4,7 @@ import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
 import { getSortedPostsList } from "@/utils/content-utils";
 import { getPostUrlBySlug, url } from "@/utils/url-utils";
+import { formatDateTimeWithSeconds } from "@/utils/date-utils";
 
 // 归档列表：全量按年分组，服务端渲染。筛选（?tag=/?category=/?uncategorized）
 // 与年份折叠由客户端脚本处理——数据本身在构建期已全部就绪。
@@ -30,9 +31,7 @@ const foldArticle = siteConfig.foldArticle !== false;
 const collapseAllButFirst = foldArticle && groups.length > 1;
 
 function formatDate(date: Date) {
-	const month = (date.getMonth() + 1).toString().padStart(2, "0");
-	const day = date.getDate().toString().padStart(2, "0");
-	return `${month}-${day}`;
+	return formatDateTimeWithSeconds(date);
 }
 
 function formatTag(tagList: string[]) {
@@ -112,12 +111,12 @@ const foldOnFilter = collapseAllButFirst;
             >
               <div class="flex flex-row justify-start items-center h-full">
                 {/* date */}
-                <div class="w-[15%] md:w-[10%] transition text-sm text-right text-50">
+                <div class="w-[40%] md:w-[25%] transition text-xs md:text-sm text-right text-50 font-mono">
                   {formatDate(post.data.published)}
                 </div>
 
                 {/* dot and line */}
-                <div class="w-[15%] md:w-[10%] relative dash-line h-full flex items-center">
+                <div class="w-[5%] md:w-[5%] relative dash-line h-full flex items-center">
                   <div class="transition-all mx-auto w-1 h-1 rounded-sm group-hover:h-5
                               bg-[oklch(0.5_0.05_var(--hue))] group-hover:bg-(--primary)
                               outline-4 z-50 outline-(--card-bg)
@@ -126,7 +125,7 @@ const foldOnFilter = collapseAllButFirst;
                 </div>
 
                 {/* post title */}
-                <div class="w-[70%] md:max-w-[65%] md:w-[65%] text-left font-bold
+                <div class="w-[55%] md:max-w-[55%] md:w-[55%] text-left font-bold
                             group-hover:translate-x-1 transition-all group-hover:text-(--primary)
                             text-75 pr-8 whitespace-nowrap text-ellipsis overflow-hidden flex items-center gap-2">
                   {post.data.category && (

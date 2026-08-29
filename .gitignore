@@ -48,3 +48,6 @@ package/
 .codex*
 .claude
 .mimocode
+
+.vercel
+.env*
