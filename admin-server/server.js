@@ -45,8 +45,15 @@ var upload = multer({
 var galleryStorage = multer.diskStorage({
   destination: function(req, file, cb) {
     var albumId = req.params.id;
-    if (!albumId || !validateAlbumId(albumId)) return cb(new Error("无效的相册 ID"));
+    // 使用更严格的验证
+    if (!albumId || !validateAlbumIdSafe(albumId)) {
+      return cb(new Error("无效的相册 ID：只能包含字母、数字、连字符和下划线"));
+    }
     var albumDir = path.join(GALLERY_DIR, albumId);
+    // 确保路径在 GALLERY_DIR 内
+    if (!isPathContained(albumDir, GALLERY_DIR)) {
+      return cb(new Error("路径不安全"));
+    }
     if (!fs.existsSync(albumDir)) fs.mkdirSync(albumDir, { recursive: true });
     cb(null, albumDir);
   },
@@ -116,6 +123,7 @@ function rateLimit(maxReq, windowMs) {
 function validateSlug(slug) {
   if (!slug || typeof slug !== "string") return false;
   if (/\.\./.test(slug) || /^\//.test(slug) || /\0/.test(slug)) return false;
+  // 严格白名单：只允许字母、数字、中文、连字符、下划线
   return /^[a-zA-Z0-9\u4e00-\u9fff_-]+$/.test(slug);
 }
 function safeFindPostFile(slug) {
@@ -135,6 +143,51 @@ function isPathContained(filePath, baseDir) {
 function sanitizeSlug(slug) {
   if (!slug || typeof slug !== "string") return "";
   return slug.replace(/\.\./g, "").replace(/[/\\]/g, "").replace(/[^\w\u4e00-\u9fff-]/g, "").trim();
+}
+
+// 安全：验证相册 ID（只允许字母、数字、连字符、下划线）
+function validateAlbumIdSafe(id) {
+  // 显式转换为字符串，防止类型混淆攻击
+  if (id === null || id === undefined) return false;
+  var str = String(id);
+  if (str.length === 0 || str.length > 100) return false;
+  if (/\.\./.test(str) || /\0/.test(str)) return false;
+  return /^[a-zA-Z0-9_-]+$/.test(str);
+}
+
+// 安全：验证文件名（防止路径穿越）
+function validateFileName(name) {
+  // 显式转换为字符串，防止类型混淆攻击
+  if (name === null || name === undefined) return false;
+  var str = String(name);
+  if (str.length === 0 || str.length > 255) return false;
+  if (/\.\./.test(str) || /[\/\\]/.test(str) || /\0/.test(str)) return false;
+  // 只允许常见图片扩展名和安全字符
+  return /^[a-zA-Z0-9\u4e00-\u9fff_\-\.]+$/.test(str);
+}
+
+// 安全：净化用户输入用于 HTML 展示（防止 XSS）
+function sanitizeForHTML(str) {
+  if (str == null) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+    .replace(/\//g, "&#47;");
+}
+
+// 安全：净化用户输入用于 JavaScript 字符串
+function sanitizeForJS(str) {
+  if (str == null) return "";
+  return String(str)
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/\n/g, "\n")
+    .replace(/\r/g, "\r")
+    .replace(/</g, "\\x3c")
+    .replace(/>/g, "\\x3e");
 }
 
 // ── HTML helpers ──
@@ -483,7 +536,7 @@ app.post("/api/upload", rateLimit(30, 60000), function(req, res) {
 });
 
 // ── API: 文章元数据 ──
-app.get("/api/post-meta.json", function(req, res) {
+app.get("/api/post-meta.json", rateLimit(60, 60000), function(req, res) {
   try {
     res.json(getAllPosts().map(function(p) {
       return { id: p.slug, title: p.data.title || p.slug, published: p.data.published || "", draft: !!p.data.draft, pinned: !!p.data.pinned };
@@ -492,7 +545,7 @@ app.get("/api/post-meta.json", function(req, res) {
 });
 
 // ── API: 已有图片 ──
-app.get("/api/images", function(req, res) {
+app.get("/api/images", rateLimit(60, 60000), function(req, res) {
   try {
     var images = scanImages(IMAGES_DIR, "src/assets/images");
     images.sort();
@@ -501,13 +554,32 @@ app.get("/api/images", function(req, res) {
 });
 
 // ── API: 图片缩略图 ──
-app.get("/api/thumb/*", function(req, res) {
-  var relPath = req.params[0] || "";
-  if (relPath.includes("..")) return res.status(403).send("Forbidden");
-  var filePath = path.join(PROJECT_ROOT, relPath);
-  if (!isPathContained(filePath, PROJECT_ROOT)) return res.status(403).send("Forbidden");
-  if (!fs.existsSync(filePath)) return res.status(404).send("Not found");
-  res.sendFile(filePath);
+app.get("/api/thumb/*", rateLimit(120, 60000), function(req, res) {
+  try {
+    var relPath = req.params[0] || "";
+    // 严格路径验证：防止路径穿越
+    if (/\.\./.test(relPath) || /\0/.test(relPath)) {
+      return res.status(403).send("Forbidden: path traversal");
+    }
+    // 只允许 src/ 和 public/ 目录下的图片
+    var allowedPrefixes = ["src/assets/images/", "public/assets/images/", "public/gallery/"];
+    var isAllowed = allowedPrefixes.some(function(prefix) {
+      return relPath.startsWith(prefix) || relPath === prefix.slice(0, -1);
+    });
+    if (!isAllowed) {
+      return res.status(403).send("Forbidden: path not allowed");
+    }
+    var filePath = path.join(PROJECT_ROOT, relPath);
+    if (!isPathContained(filePath, PROJECT_ROOT)) {
+      return res.status(403).send("Forbidden: path escape");
+    }
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).send("Not found");
+    }
+    res.sendFile(filePath);
+  } catch (e) {
+    res.status(500).send("Internal server error");
+  }
 });
 
 // ── Dashboard 列表页 ──
@@ -650,7 +722,7 @@ app.get("/staging", function(req, res) {
 });
 
 // ── Gallery 管理列表页 ──
-app.get("/gallery-admin", function(req, res) {
+app.get("/gallery-admin", rateLimit(60, 60000), function(req, res) {
   try {
     var config = parseGalleryConfig();
     var albums = config.albums.map(function(album) {
@@ -708,11 +780,14 @@ app.get("/gallery-admin", function(req, res) {
 });
 
 // ── Gallery 新建/编辑表单页 ──
-app.get("/gallery-admin/new", function(req, res) { serveGalleryEditor(null, res); });
-app.get("/gallery-admin/edit", function(req, res) {
+app.get("/gallery-admin/new", rateLimit(30, 60000), function(req, res) { serveGalleryEditor(null, res); });
+app.get("/gallery-admin/edit", rateLimit(30, 60000), function(req, res) {
   var albumId = req.query.id;
   if (!albumId) return res.redirect("/gallery-admin");
-  if (!validateAlbumId(albumId)) return res.status(400).send(wrapHTML("错误", '<div class="container"><h1>无效的相册 ID</h1><a href="/gallery-admin" class="btn btn-ghost">← 返回列表</a></div>'));
+  // 使用更严格的验证
+  if (!validateAlbumIdSafe(albumId)) {
+    return res.status(400).send(wrapHTML("错误", '<div class="container"><h1>无效的相册 ID</h1><p>相册 ID 只能包含字母、数字、连字符和下划线。</p><a href="/gallery-admin" class="btn btn-ghost">← 返回列表</a></div>'));
+  }
   serveGalleryEditor(albumId, res);
 });
 
@@ -1242,7 +1317,7 @@ app.delete("/api/post/:slug", rateLimit(30, 60000), async function(req, res) {
 });
 
 // ── API: 单篇推送 ──
-app.post("/api/staging/push-single", async function(req, res) {
+app.post("/api/staging/push-single", rateLimit(10, 60000), async function(req, res) {
   try {
     var slugs = (req.body.slugs || []).map(function(s) { return sanitizeSlug(s); }).filter(function(s) { return validateSlug(s); });
     if (slugs.length === 0) return res.json({ ok: false, error: "无有效文章" });
@@ -1263,7 +1338,7 @@ app.post("/api/staging/push-single", async function(req, res) {
 });
 
 // ── API: 批量推送 ──
-app.post("/api/staging/batch-push", async function(req, res) {
+app.post("/api/staging/batch-push", rateLimit(5, 60000), async function(req, res) {
   try {
     var stagingList = loadStaging();
     if (stagingList.length === 0) return res.json({ ok: false, error: "暂存列表为空" });
@@ -1284,7 +1359,7 @@ app.post("/api/staging/batch-push", async function(req, res) {
 });
 
 // ── API: 移除暂存 ──
-app.post("/api/staging/remove", function(req, res) {
+app.post("/api/staging/remove", rateLimit(30, 60000), function(req, res) {
   try {
     var slug = sanitizeSlug(req.body.slug);
     if (!validateSlug(slug)) return res.json({ ok: false, error: "无效的 slug" });
@@ -1300,7 +1375,7 @@ app.post("/api/staging/remove", function(req, res) {
 // ══════════════════════════════════════════════
 
 // ── API: 获取相册列表 ──
-app.get("/api/gallery", function(req, res) {
+app.get("/api/gallery", rateLimit(60, 60000), function(req, res) {
   try {
     var config = parseGalleryConfig();
     var albums = config.albums.map(function(album) {
@@ -1334,7 +1409,10 @@ app.post("/api/gallery", rateLimit(30, 60000), async function(req, res) {
     var albumName = (body.name || "").trim();
 
     if (!albumId) return res.json({ ok: false, error: "请填写相册 ID" });
-    if (!validateAlbumId(albumId)) return res.json({ ok: false, error: "相册 ID 只能包含字母、数字、连字符和下划线" });
+    // 使用更严格的验证
+    if (!validateAlbumIdSafe(albumId)) {
+      return res.json({ ok: false, error: "相册 ID 只能包含字母、数字、连字符和下划线" });
+    }
     if (!albumName) return res.json({ ok: false, error: "请填写相册名称" });
 
     var config = parseGalleryConfig();
@@ -1384,7 +1462,10 @@ app.post("/api/gallery", rateLimit(30, 60000), async function(req, res) {
 app.delete("/api/gallery/:id", rateLimit(30, 60000), async function(req, res) {
   try {
     var albumId = req.params.id;
-    if (!validateAlbumId(albumId)) return res.json({ ok: false, error: "无效的相册 ID" });
+    // 使用更严格的验证
+    if (!validateAlbumIdSafe(albumId)) {
+      return res.json({ ok: false, error: "无效的相册 ID" });
+    }
 
     var config = parseGalleryConfig();
     var existIdx = -1;
@@ -1430,10 +1511,18 @@ app.post("/api/gallery/:id/upload", rateLimit(30, 60000), function(req, res) {
 });
 
 // ── API: 获取相册图片列表 ──
-app.get("/api/gallery/:id/photos", function(req, res) {
+app.get("/api/gallery/:id/photos", rateLimit(60, 60000), function(req, res) {
   try {
     var albumId = req.params.id;
-    if (!validateAlbumId(albumId)) return res.json({ ok: false, error: "无效的相册 ID" });
+    // 使用更严格的验证
+    if (!validateAlbumIdSafe(albumId)) {
+      return res.json({ ok: false, error: "无效的相册 ID：只能包含字母、数字、连字符和下划线" });
+    }
+    // 确保路径在 GALLERY_DIR 内
+    var albumDir = path.join(GALLERY_DIR, albumId);
+    if (!isPathContained(albumDir, GALLERY_DIR)) {
+      return res.json({ ok: false, error: "路径不安全" });
+    }
 
     var albumDir = path.join(GALLERY_DIR, albumId);
     var photos = [];
@@ -1461,18 +1550,25 @@ app.delete("/api/gallery/:id/photo", rateLimit(30, 60000), function(req, res) {
   try {
     var albumId = req.params.id;
     var photoName = req.query.name;
-    if (!validateAlbumId(albumId)) return res.json({ ok: false, error: "无效的相册 ID" });
-    if (!photoName) return res.json({ ok: false, error: "请指定要删除的图片" });
-
-    // 防路径穿越
-    if (photoName.indexOf("..") >= 0 || photoName.indexOf("/") >= 0 || photoName.indexOf("\\") >= 0) {
-      return res.json({ ok: false, error: "无效的文件名" });
+    
+    // 使用更严格的验证
+    if (!validateAlbumIdSafe(albumId)) {
+      return res.json({ ok: false, error: "无效的相册 ID" });
+    }
+    if (!photoName || !validateFileName(photoName)) {
+      return res.json({ ok: false, error: "无效的文件名：只能包含字母、数字、中文、连字符、下划线和点" });
     }
 
     var photoPath = path.join(GALLERY_DIR, albumId, photoName);
     var albumDir = path.join(GALLERY_DIR, albumId);
-    if (!isPathContained(photoPath, albumDir)) return res.json({ ok: false, error: "路径不安全" });
-    if (!fs.existsSync(photoPath)) return res.json({ ok: false, error: "文件不存在" });
+    
+    // 确保路径在 GALLERY_DIR 内
+    if (!isPathContained(photoPath, albumDir)) {
+      return res.json({ ok: false, error: "路径不安全" });
+    }
+    if (!fs.existsSync(photoPath)) {
+      return res.json({ ok: false, error: "文件不存在" });
+    }
 
     fs.unlinkSync(photoPath);
     res.json({ ok: true, message: "图片「" + photoName + "」已删除" });
@@ -1485,12 +1581,26 @@ app.delete("/api/gallery/:id/photo", rateLimit(30, 60000), function(req, res) {
 app.post("/api/gallery/:id/urls", rateLimit(30, 60000), function(req, res) {
   try {
     var albumId = req.params.id;
-    if (!validateAlbumId(albumId)) return res.json({ ok: false, error: "无效的相册 ID" });
+    // 使用更严格的验证
+    if (!validateAlbumIdSafe(albumId)) {
+      return res.json({ ok: false, error: "无效的相册 ID" });
+    }
 
     var albumDir = path.join(GALLERY_DIR, albumId);
+    // 确保路径在 GALLERY_DIR 内
+    if (!isPathContained(albumDir, GALLERY_DIR)) {
+      return res.json({ ok: false, error: "路径不安全" });
+    }
     if (!fs.existsSync(albumDir)) fs.mkdirSync(albumDir, { recursive: true });
 
-    var urls = (req.body.urls || []).map(function(u) { return String(u).trim(); }).filter(Boolean);
+    // 验证每个 URL
+    var urls = (req.body.urls || [])
+      .map(function(u) { return String(u).trim(); })
+      .filter(function(u) {
+        // 只允许 http/https URL
+        return u && /^https?:\/\//.test(u) && u.length < 2048;
+      });
+    
     var urlsFile = path.join(albumDir, "urls.txt");
     fs.writeFileSync(urlsFile, urls.join("\n"), "utf-8");
 
