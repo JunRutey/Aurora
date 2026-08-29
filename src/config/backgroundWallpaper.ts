@@ -51,13 +51,13 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 		],
 		// 移动背景图片（支持单张或多张随机）
 		mobile: [
-			"assets/images/MobileWallpaper/m1.webp",
-			"assets/images/MobileWallpaper/m2.webp",
-			"assets/images/MobileWallpaper/m3.webp",
-			"assets/images/MobileWallpaper/m4.webp",
-			"assets/images/MobileWallpaper/m5.webp",
-			"assets/images/MobileWallpaper/m6.webp",
-			"assets/images/MobileWallpaper/m7.webp",
+			"assets/images/MobileWallpaper/134477391_p0.jpg",
+			"assets/images/MobileWallpaper/138687752_p0.jpg",
+			"assets/images/MobileWallpaper/138868564_p0.jpg",
+			"assets/images/MobileWallpaper/141821567_p0 (1).jpg",
+			"assets/images/MobileWallpaper/141955037_p0 (1).jpg",
+			"assets/images/MobileWallpaper/146681548_p0.jpg",
+			"assets/images/MobileWallpaper/c271d486-f66f-4a02-ba78-ca0e6c11552e.jpg",
 		],
 		// 背景视频播放地址
 		// 支持单个视频路径（字符串）或多个视频循环（数组，参考上面壁纸配置）
