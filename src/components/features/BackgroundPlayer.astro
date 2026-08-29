@@ -62,9 +62,12 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 
 			<div
 				id="bg-player-cache-status"
-				class="fixed bottom-4 right-4 z-30 px-3 py-1.5 rounded-lg bg-black/50 text-white/70 text-xs backdrop-blur-sm opacity-0 transition-opacity duration-300 pointer-events-none"
+				class="fixed bottom-4 right-4 z-30 px-3 py-1.5 rounded-lg bg-black/50 text-white/70 text-xs backdrop-blur-sm opacity-0 transition-opacity duration-300 pointer-events-none flex items-center gap-2"
 			>
-				缓存中...
+				<span id="cache-progress-text">缓存视频中...</span>
+				<span id="cache-progress-bar" class="w-16 h-1 bg-white/20 rounded overflow-hidden">
+					<span id="cache-progress-fill" class="h-full bg-white/70 transition-all duration-300" style="width: 0%"></span>
+				</span>
 			</div>
 		</div>
 	)
@@ -82,6 +85,8 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 		var nextBtn = document.getElementById("bg-next-btn");
 		var toast = document.getElementById("bg-player-toast");
 		var cacheStatus = document.getElementById("bg-player-cache-status");
+		var progressText = document.getElementById("cache-progress-text");
+		var progressFill = document.getElementById("cache-progress-fill");
 
 		if (!video) return;
 
@@ -93,8 +98,6 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 		var currentIndex = 0;
 		var errorCount = 0;
 		var toastTimer = null;
-		var swReady = false;
-		var videoCache = {};
 
 		// ========== Service Worker 注册与预缓存 ==========
 
@@ -104,34 +107,44 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 		function registerSW() {
 			if (!('serviceWorker' in navigator)) return;
 
-			// 等待页面加载完成
-			if (document.readyState !== 'complete') {
-				window.addEventListener('load', function() {
-					setTimeout(doRegisterSW, 2000);
-				}, { once: true });
-			} else {
-				setTimeout(doRegisterSW, 2000);
-			}
+			// 页面加载后 500ms 开始注册
+			var delay = document.readyState === 'complete' ? 500 : 1500;
+			setTimeout(doRegisterSW, delay);
 		}
 
 		function doRegisterSW() {
 			navigator.serviceWorker.register('/sw.js', { scope: '/' })
 				.then(function(reg) {
 					console.log('[VideoCache] SW registered');
-					swReady = true;
 					
-					// 监听预缓存完成
+					// 监听消息
 					navigator.serviceWorker.addEventListener('message', function(event) {
-						if (event.data?.type === 'PREFETCH_COMPLETE') {
+						var data = event.data;
+						if (data?.type === 'CACHE_PROGRESS') {
+							// 更新进度
+							var percent = Math.round((data.completed / data.total) * 100);
+							updateCacheProgress(percent, data.completed, data.total);
+						}
+						if (data?.type === 'PREFETCH_COMPLETE') {
 							console.log('[VideoCache] Prefetch done');
-							hideCacheStatus();
-							// 标记所有视频已缓存
-							urlList.forEach(function(url) { videoCache[url] = true; });
+							updateCacheProgress(100, data.total, data.total);
+							setTimeout(hideCacheStatus, 500);
 						}
 					});
 
-					// 触发预缓存（在浏览器空闲时）
-					prefetchVideos();
+					// 等待 SW 激活后开始预缓存
+					if (reg.active) {
+						startPrefetch();
+					} else {
+						reg.addEventListener('updatefound', function() {
+							var newSW = reg.installing;
+							newSW.addEventListener('statechange', function() {
+								if (newSW.state === 'activated') {
+									startPrefetch();
+								}
+							});
+						});
+					}
 				})
 				.catch(function(err) {
 					console.warn('[VideoCache] SW failed:', err);
@@ -139,52 +152,17 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 		}
 
 		/**
-		 * 预缓存视频
+		 * 开始预缓存
 		 */
-		function prefetchVideos() {
+		function startPrefetch() {
+			showCacheStatus();
 			navigator.serviceWorker.ready.then(function(reg) {
 				if (reg.active) {
-					showCacheStatus();
 					reg.active.postMessage({
 						type: 'PREFETCH_VIDEOS',
 						urls: urlList,
 					});
 				}
-			});
-		}
-
-		/**
-		 * 检查视频是否已缓存
-		 */
-		function checkVideoCached(url) {
-			if (!('caches' in window)) return Promise.resolve(false);
-			
-			return caches.open('aurora-video-cache').then(function(cache) {
-				return cache.match(url).then(function(response) {
-					return !!response;
-				});
-			}).catch(function() {
-				return false;
-			});
-		}
-
-		/**
-		 * 获取缓存的视频 URL
-		 */
-		function getCachedUrl(url) {
-			if (!('caches' in window)) return Promise.resolve(null);
-			
-			return caches.open('aurora-video-cache').then(function(cache) {
-				return cache.match(url).then(function(response) {
-					if (response) {
-						return response.blob().then(function(blob) {
-							return URL.createObjectURL(blob);
-						});
-					}
-					return null;
-				});
-			}).catch(function() {
-				return null;
 			});
 		}
 
@@ -205,6 +183,22 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 			if (cacheStatus) {
 				cacheStatus.classList.remove('opacity-100');
 				cacheStatus.classList.add('opacity-0');
+			}
+		}
+
+		/**
+		 * 更新缓存进度
+		 */
+		function updateCacheProgress(percent, current, total) {
+			if (progressFill) {
+				progressFill.style.width = percent + '%';
+			}
+			if (progressText) {
+				if (percent >= 100) {
+					progressText.textContent = '缓存完成';
+				} else {
+					progressText.textContent = '缓存 ' + current + '/' + total;
+				}
 			}
 		}
 
@@ -244,33 +238,15 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 		}
 
 		/**
-		 * 播放视频 - 优先从缓存读取
+		 * 播放视频
+		 * Service Worker 会自动从缓存读取
 		 */
 		function doPlay() {
-			var url = urlList[currentIndex];
-			
-			// 尝试从缓存获取
-			getCachedUrl(url).then(function(cachedUrl) {
-				if (cachedUrl) {
-					console.log('[VideoCache] Playing from cache:', url);
-					video.src = cachedUrl;
-				} else {
-					console.log('[VideoCache] Playing from network:', url);
-					video.src = url;
-				}
-				
-				video.muted = true;
-				video.play()
-					.then(function () { setTimeout(function () { if (video) video.muted = false; }, 100); })
-					.catch(function () { isPlaying = false; syncAttr(); });
-			}).catch(function() {
-				// 缓存读取失败，降级到网络
-				video.src = url;
-				video.muted = true;
-				video.play()
-					.then(function () { setTimeout(function () { if (video) video.muted = false; }, 100); })
-					.catch(function () { isPlaying = false; syncAttr(); });
-			});
+			video.src = urlList[currentIndex];
+			video.muted = true;
+			video.play()
+				.then(function () { setTimeout(function () { if (video) video.muted = false; }, 100); })
+				.catch(function () { isPlaying = false; syncAttr(); });
 		}
 
 		function switchTrack(index) {
@@ -279,15 +255,8 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 			if (isPlaying) {
 				doPlay();
 			} else {
-				// 预加载但不播放
-				var url = urlList[currentIndex];
-				getCachedUrl(url).then(function(cachedUrl) {
-					video.src = cachedUrl || url;
-					video.load();
-				}).catch(function() {
-					video.src = url;
-					video.load();
-				});
+				video.src = urlList[currentIndex];
+				video.load();
 			}
 		}
 
@@ -319,18 +288,10 @@ const tLoadError = i18n(I18nKey.videoLoadError);
 		function onError() {
 			errorCount++;
 			if (isMultiple && errorCount < urlList.length) {
-				// 多视频模式下自动尝试下一个
 				currentIndex = pickIndex(currentIndex);
-				var url = urlList[currentIndex];
-				getCachedUrl(url).then(function(cachedUrl) {
-					video.src = cachedUrl || url;
-					video.load();
-				}).catch(function() {
-					video.src = url;
-					video.load();
-				});
+				video.src = urlList[currentIndex];
+				video.load();
 			} else {
-				// 所有视频都失败或只有单个视频
 				isPlaying = false;
 				if (overlay) { overlay.classList.remove("opacity-100"); overlay.classList.add("opacity-0"); }
 				syncAttr();
