@@ -38,7 +38,7 @@ export const analyticsConfig: AnalyticsConfig = {
 			// - "link": 显示"访问统计"链接（免费计划推荐）
 			// - "iframe": 嵌入 Share URL（免费计划可用，会显示完整仪表板）
 			// - "api": 通过 API 获取数据并显示数字（需要付费计划）
-			mode: "link",
+			mode: "iframe",
 			// Umami Cloud Share URL（link 和 iframe 模式使用）
 			shareUrl: "https://cloud.umami.is/share/Qpo5oYVQZZZsodHO",
 			// Umami Cloud API 地址（api 模式使用）

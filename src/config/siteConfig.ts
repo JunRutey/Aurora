@@ -336,13 +336,8 @@ export const siteConfig: SiteConfig = {
 	pages,
 
 	// Umami 访问统计显示配置
-	// 需要在 analyticsConfig.ts 中配置 umamiAnalytics.stats 并设置 API Key
 	umamiStats: {
-		// 是否在页面显示访问统计
-		enabled: true,
-		// 显示位置："footer"=页脚
-		position: "footer",
-		// 显示样式："text"=纯文本
-		style: "text",
+		// 是否在页脚显示访问统计（已集成到 SiteStats 组件中，此处禁用）
+		enabled: false,
 	},
 };
