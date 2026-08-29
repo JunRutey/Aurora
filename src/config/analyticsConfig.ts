@@ -34,17 +34,10 @@ export const analyticsConfig: AnalyticsConfig = {
 		stats: {
 			// 是否启用访问统计显示
 			enabled: true,
-			// 显示方式：
-			// - "link": 显示"访问统计"链接（免费计划推荐）
-			// - "iframe": 嵌入 Share URL（免费计划可用，会显示完整仪表板）
-			// - "api": 通过 API 获取数据并显示数字（需要付费计划）
-			mode: "iframe",
-			// Umami Cloud Share URL（link 和 iframe 模式使用）
+			// 显示方式："link"=链接跳转
+			mode: "link",
+			// Umami Cloud Share URL
 			shareUrl: "https://cloud.umami.is/share/Qpo5oYVQZZZsodHO",
-			// Umami Cloud API 地址（api 模式使用）
-			apiUrl: "https://api.umami.is",
-			// Umami API Key（api 模式使用，需要付费计划）
-			apiKey: "",
 		},
 	},
 	// 51la 统计配置

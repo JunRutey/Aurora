@@ -337,7 +337,7 @@ export const siteConfig: SiteConfig = {
 
 	// Umami 访问统计显示配置
 	umamiStats: {
-		// 是否在页脚显示访问统计（已集成到 SiteStats 组件中，此处禁用）
-		enabled: false,
+		// 是否在页脚显示访问统计链接
+		enabled: true,
 	},
 };
