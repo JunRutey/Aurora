@@ -4,7 +4,22 @@
     "mobile": []
   },
   "video": "",
-  "music": [],
+  "music": [
+    {
+      "name": "还是分开",
+      "artist": "张叶蕾",
+      "url": "/assets/music/还是分开.mp3",
+      "cover": "/assets/music/cover/oip-c-1788126620217.webp",
+      "lrc": ""
+    },
+    {
+      "name": "还是分开",
+      "artist": "张叶蕾",
+      "url": "/assets/music/还是分开.mp3",
+      "cover": "/assets/music/cover/resizedimage_2026-08-31_05-51-20_1808-1--1788126739279.jpg",
+      "lrc": ""
+    }
+  ],
   "announcement": {
     "title": "",
     "content": "",
