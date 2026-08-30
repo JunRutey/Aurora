@@ -1092,15 +1092,25 @@ app.post("/api/config/friends", rateLimit(30, 60000), function(req, res) {
 });
 
 app.get("/api/config/about", rateLimit(30, 60000), function(req, res) {
-  var cfg = loadSiteConfig();
-  res.json({ ok: true, about: cfg.about || "" });
+  try {
+    var aboutPath = path.join(CONTENT_DIR, "spec", "about.md");
+    var content = fs.existsSync(aboutPath) ? fs.readFileSync(aboutPath, "utf-8") : "";
+    res.json({ ok: true, about: content });
+  } catch(e) {
+    res.json({ ok: true, about: "" });
+  }
 });
 
 app.post("/api/config/about", rateLimit(30, 60000), function(req, res) {
-  var cfg = loadSiteConfig();
-  cfg.about = req.body.about || "";
-  saveSiteConfig(cfg);
-  res.json({ ok: true });
+  try {
+    var aboutPath = path.join(CONTENT_DIR, "spec", "about.md");
+    var dir = path.dirname(aboutPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(aboutPath, req.body.about || "", "utf-8");
+    res.json({ ok: true });
+  } catch(e) {
+    res.json({ ok: false, error: e.message });
+  }
 });
 
 app.post("/api/config/publish", rateLimit(10, 60000), async function(req, res) {
@@ -2532,7 +2542,7 @@ function parseSiteConfig(text) {
       cfg.friends = friends;
     }
     else if (title === "about") {
-      cfg.about = body;
+      // about 内容现在存储在 src/content/spec/about.md，不再从 site-config.md 读取
     }
   });
   return cfg;
@@ -2548,7 +2558,7 @@ function writeSiteConfigFromObj(cfg) {
   (cfg.friends || []).forEach(function(f) {
     md += "- name: " + (f.name || "") + "\n  url: " + (f.url || "") + "\n  icon: " + (f.icon || "") + "\n  desc: " + (f.desc || "") + "\n";
   });
-  md += "\n## About\n\n" + (cfg.about || "") + "\n";
+  // about 内容现在存储在 src/content/spec/about.md，不再写入 site-config.md
   writeSiteConfig(md);
 }
 
@@ -2557,6 +2567,9 @@ app.get("/site-config", rateLimit(30, 60000), function(req, res) {
   try {
     var cfg = parseSiteConfig(readSiteConfig());
     var friendsJSON = JSON.stringify(cfg.friends);
+    // about 内容从 src/content/spec/about.md 读取
+    var aboutPath = path.join(CONTENT_DIR, "spec", "about.md");
+    var aboutContent = fs.existsSync(aboutPath) ? fs.readFileSync(aboutPath, "utf-8") : "";
 
     var body = '<div class="container">';
     body += '<header><h1>' + icCog + ' 站点配置</h1>';
@@ -2602,7 +2615,7 @@ app.get("/site-config", rateLimit(30, 60000), function(req, res) {
     // About
     body += '<div style="background:#fff;border-radius:10px;border:1px solid #e8e8f0;padding:20px;margin-bottom:16px">';
     body += '<h3 style="margin:0 0 12px;font-size:15px">👤 关于我</h3>';
-    body += '<textarea id="about" rows="5" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px;resize:vertical;font-family:inherit" placeholder="个人介绍，支持 Markdown">' + esc(cfg.about) + '</textarea>';
+    body += '<textarea id="about" rows="5" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px;resize:vertical;font-family:inherit" placeholder="个人介绍，支持 Markdown">' + esc(aboutContent) + '</textarea>';
     body += '</div>';
 
     body += '<div style="text-align:right;margin-top:20px;padding-bottom:40px">';
@@ -2656,6 +2669,12 @@ app.get("/site-config", rateLimit(30, 60000), function(req, res) {
 app.post("/api/site-config", rateLimit(30, 60000), function(req, res) {
   try {
     var data = req.body;
+    // about 内容保存到 src/content/spec/about.md
+    var aboutPath = path.join(CONTENT_DIR, "spec", "about.md");
+    var aboutDir = path.dirname(aboutPath);
+    if (!fs.existsSync(aboutDir)) fs.mkdirSync(aboutDir, { recursive: true });
+    fs.writeFileSync(aboutPath, data.about || "", "utf-8");
+    // 其他配置保存到 site-config.md
     writeSiteConfigFromObj(data);
     res.json({ ok: true, message: "配置已保存" });
   } catch(e) {
@@ -3003,8 +3022,9 @@ app.get("/config/announcement", rateLimit(30, 60000), function(req, res) {
 
 // ── 关于我管理页（直接进入编辑页，不带导航栏） ──
 app.get("/config/about", rateLimit(30, 60000), function(req, res) {
-  var cfg = loadSiteConfig();
-  var aboutContent = cfg.about || "";
+  // about 内容从 src/content/spec/about.md 读取
+  var aboutPath = path.join(CONTENT_DIR, "spec", "about.md");
+  var aboutContent = fs.existsSync(aboutPath) ? fs.readFileSync(aboutPath, "utf-8") : "";
 
   var body = '<div class="container" style="max-width:920px;">';
   body += '<header><h1>关于我</h1>';
@@ -3013,6 +3033,9 @@ app.get("/config/about", rateLimit(30, 60000), function(req, res) {
 
   body += '<div style="background:#fff;border:1px solid #e8e8e8;border-radius:12px;padding:20px;box-shadow:0 12px 30px rgba(15,23,42,.04)">';
   body += '<div class="form-group"><label>个人介绍 (Markdown)</label>';
+  body += '<div style="display:flex;gap:6px;margin-bottom:8px">';
+  body += '<button type="button" class="btn btn-ghost btn-sm" onclick="insertAboutLink()">🔗 插入链接</button>';
+  body += '</div>';
   body += '<textarea id="aboutContent" rows="15" style="min-height:300px;resize:vertical;font-family:inherit;width:100%;padding:12px;border:1px solid #e2e8f0;border-radius:8px" placeholder="在这里写下你的个人介绍...">' + esc(aboutContent) + '</textarea></div>';
   body += '</div>';
 
@@ -3020,6 +3043,7 @@ app.get("/config/about", rateLimit(30, 60000), function(req, res) {
   body += '</div>';
 
   body += '<script>';
+  body += 'function insertAboutLink(){var text=prompt("链接文字:","链接文字");if(text===null)return;var url=prompt("链接 URL:","https://");if(!url)return;var md="["+text+"]("+url+")";var ed=document.getElementById("aboutContent");var s=ed.selectionStart,e=ed.selectionEnd;ed.value=ed.value.slice(0,s)+md+ed.value.slice(e);ed.selectionStart=ed.selectionEnd=s+md.length;ed.focus()}';
   body += 'function saveAbout(){fetch("/api/config/about",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({about:document.getElementById("aboutContent").value})}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ 已保存","success")}else{showToast("❌ "+(j.error||"保存失败"),"error")}})}';
   body += 'function publishConfig(){saveAbout();fetch("/api/config/publish",{method:"POST"}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ "+j.message,"success")}else{showToast("❌ "+(j.error||"推送失败"),"error")}})}';
   body += '</script>';
