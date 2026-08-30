@@ -1224,6 +1224,8 @@ app.get("/", function(req, res) {
 
     body += '<aside class="side-column">';
     body += '<div class="quick-card"><h4>快捷操作</h4><div class="quick-list">';
+    body += '<a href="/posts" class="quick-link">' + icDoc + ' 全部文章<span class="count-badge">' + totalPosts + '</span></a>';
+    body += '<a href="/dynamics" class="quick-link">' + icInbox + ' 全部动态<span class="count-badge">' + dynamicEntries.length + '</span></a>';
     body += '<a href="/gallery-admin" class="quick-link">' + icImage + ' 相册管理</a>';
     body += '<a href="/staging" class="quick-link">' + icInbox + ' 暂存列表' + (stagedCount > 0 ? '<span class="count-badge">' + stagedCount + '</span>' : '') + '</a>';
     body += '<a href="/config/announcement" class="quick-link">' + icAnnounce + ' 公告管理</a>';
@@ -1250,6 +1252,71 @@ app.get("/", function(req, res) {
   } catch (e) {
     res.status(500).send(wrapHTML("错误", '<div class="container"><h1>错误</h1><pre>' + esc(e.message) + '</pre></div>'));
   }
+});
+
+// ── 全部文章列表页 ──
+app.get("/posts", rateLimit(30, 60000), function(req, res) {
+  try {
+    var posts = getAllPosts();
+    posts.sort(function(a, b) { return new Date(b.data.published) - new Date(a.data.published); });
+    var body = '<div class="app-shell"><header class="app-header"><div class="header-brand"><div class="brand-mark"><svg viewBox="0 0 64 64"><path d="M32 5 L38 22 L55 28 L38 34 L32 52 L26 34 L9 28 L26 22 Z" fill="white"/></svg></div><div class="header-brand-text"><strong>Aurora</strong><span>全部文章</span></div></div><div class="header-actions"><a href="/" class="mini-btn">🏠 返回后台</a><a href="/new" class="primary-action" style="display:inline-flex;align-items:center;gap:6px;padding:10px 18px;text-decoration:none;font-weight:600;font-size:13px;border-radius:12px;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff">+ 新建文章</a></div></header>';
+    body += '<div class="stats-grid" style="grid-template-columns:repeat(2,minmax(140px,1fr))"><div class="stat-badge"><span class="label">总文章</span><strong>' + posts.length + '</strong></div><div class="stat-badge"><span class="label">草稿</span><strong>' + posts.filter(function(p){return p.data.draft}).length + '</strong></div></div>';
+    body += '<div class="app-main" style="flex-direction:column"><div class="main-column" style="width:100%"><div class="list-card"><div class="list-card-header"><h3>文章列表</h3><span>' + posts.length + ' 篇</span></div><div class="list-card-body" style="padding:0">';
+    if (posts.length === 0) {
+      body += '<div class="empty-state" style="padding:40px;text-align:center"><p style="color:#94a3b8;margin:0 0 16px">暂无文章</p><a href="/new" class="btn btn-primary">新建文章</a></div>';
+    } else {
+      body += '<table class="list-table"><thead><tr><th>标题</th><th>日期</th><th>标签</th><th style="text-align:right">操作</th></tr></thead><tbody>';
+      posts.forEach(function(p) {
+        var tags = (p.data.tags || []).map(function(t) { return '<span class="tag">' + esc(t) + '</span>'; }).join("");
+        var badges = [];
+        if (p.data.draft) badges.push('<span class="draft-badge">草稿</span>');
+        if (p.data.pinned) badges.push('<span class="pinned-badge">置顶</span>');
+        var date = p.data.published ? parseDateFlexible(p.data.published).toLocaleString("zh-CN", { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", hour12:false, timeZone:"Asia/Shanghai" }) : "-";
+        body += '<tr><td><a href="/edit?slug=' + encodeURIComponent(p.slug) + '" style="color:#2563eb;text-decoration:none;font-weight:500">' + esc(p.data.title || p.slug) + '</a> ' + badges.join(" ") + '</td><td style="color:#64748b;font-size:13px">' + date + '</td><td>' + (tags || '<span style="color:#cbd5e1">-</span>') + '</td><td style="text-align:right"><div style="display:flex;gap:6px;justify-content:flex-end"><a href="/edit?slug=' + encodeURIComponent(p.slug) + '" class="btn btn-ghost btn-sm">编辑</a><button class="btn btn-danger btn-sm" onclick="deletePost(\'' + escJS(p.slug) + '\')">删除</button></div></td></tr>';
+      });
+      body += '</tbody></table>';
+    }
+    body += '</div></div></div></div></div>';
+    body += '<script>function deletePost(slug){if(!confirm("确定删除 "+slug+" ?"))return;var btn=event.target;setLoading(btn,true);fetch("/api/post/"+encodeURIComponent(slug),{method:"DELETE"}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast(j.message,"success");setTimeout(function(){location.reload()},800)}else{showToast(j.error||"删除失败","error")}}).catch(function(){showToast("网络错误","error")})}</script>';
+    res.send(wrapHTML("全部文章", body));
+  } catch (e) { res.status(500).send(wrapHTML("错误", '<div class="container"><h1>错误</h1><pre>' + esc(e.message) + '</pre></div>')); }
+});
+
+// ── 全部动态列表页 ──
+app.get("/dynamics", rateLimit(30, 60000), function(req, res) {
+  try {
+    var dynamicDir = path.join(PROJECT_ROOT, "src", "content", "dynamic");
+    var dynamics = [];
+    if (fs.existsSync(dynamicDir)) {
+      var files = fs.readdirSync(dynamicDir).filter(function(f) { return /\.(md|mdx)$/i.test(f); });
+      files.forEach(function(f) {
+        var raw = fs.readFileSync(path.join(dynamicDir, f), "utf-8");
+        var parsed = matter(raw);
+        dynamics.push({ slug: f.replace(/\.(md|mdx)$/i, ""), file: f, published: parsed.data.published || null, pinned: parsed.data.pinned || false, location: parsed.data.location || "", content: (parsed.content || "").trim().slice(0, 120) });
+      });
+    }
+    dynamics.sort(function(a, b) { return (b.published ? new Date(b.published) : 0) - (a.published ? new Date(a.published) : 0); });
+
+    var body = '<div class="app-shell"><header class="app-header"><div class="header-brand"><div class="brand-mark"><svg viewBox="0 0 64 64"><path d="M32 5 L38 22 L55 28 L38 34 L32 52 L26 34 L9 28 L26 22 Z" fill="white"/></svg></div><div class="header-brand-text"><strong>Aurora</strong><span>全部动态</span></div></div><div class="header-actions"><a href="/" class="mini-btn">🏠 返回后台</a><a href="/new-dynamic" class="primary-action" style="display:inline-flex;align-items:center;gap:6px;padding:10px 18px;text-decoration:none;font-weight:600;font-size:13px;border-radius:12px;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff">+ 新建动态</a></div></header>';
+    body += '<div class="stats-grid" style="grid-template-columns:repeat(2,minmax(140px,1fr))"><div class="stat-badge"><span class="label">总动态</span><strong>' + dynamics.length + '</strong></div><div class="stat-badge"><span class="label">置顶</span><strong>' + dynamics.filter(function(d){return d.pinned}).length + '</strong></div></div>';
+    body += '<div class="app-main" style="flex-direction:column"><div class="main-column" style="width:100%"><div class="list-card"><div class="list-card-header"><h3>动态列表</h3><span>' + dynamics.length + ' 条</span></div><div class="list-card-body" style="padding:0">';
+
+    if (dynamics.length === 0) {
+      body += '<div class="empty-state" style="padding:40px;text-align:center"><p style="color:#94a3b8;margin:0 0 16px">暂无动态</p><a href="/new-dynamic" class="btn btn-primary">新建动态</a></div>';
+    } else {
+      body += '<table class="list-table"><thead><tr><th>内容</th><th>日期</th><th>位置</th><th style="text-align:right">操作</th></tr></thead><tbody>';
+      dynamics.forEach(function(d) {
+        var badges = d.pinned ? '<span class="pinned-badge">置顶</span>' : '';
+        var date = d.published ? new Date(d.published).toLocaleString("zh-CN", { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", hour12:false, timeZone:"Asia/Shanghai" }) : "-";
+        var preview = esc(d.content.replace(/!\[.*?\]\(.*?\)/g, "[图片]").replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/\n/g, " ").slice(0, 80));
+        body += '<tr><td style="max-width:300px"><span style="color:#1a1a1a">' + preview + (d.content.length > 80 ? "..." : "") + '</span> ' + badges + '</td><td style="color:#64748b;font-size:13px;white-space:nowrap">' + date + '</td><td style="color:#64748b;font-size:13px">' + (d.location ? esc(d.location) : '<span style="color:#cbd5e1">-</span>') + '</td><td style="text-align:right"><button class="btn btn-danger btn-sm" onclick="deleteDynamic(\'' + escJS(d.slug) + '\')">删除</button></td></tr>';
+      });
+      body += '</tbody></table>';
+    }
+    body += '</div></div></div></div></div>';
+    body += '<script>function deleteDynamic(slug){if(!confirm("确定删除动态 "+slug+" ?"))return;var btn=event.target;setLoading(btn,true);fetch("/api/dynamic/"+encodeURIComponent(slug),{method:"DELETE"}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast(j.message,"success");setTimeout(function(){location.reload()},800)}else{showToast(j.error||"删除失败","error")}}).catch(function(){showToast("网络错误","error")})}</script>';
+    res.send(wrapHTML("全部动态", body));
+  } catch (e) { res.status(500).send(wrapHTML("错误", '<div class="container"><h1>错误</h1><pre>' + esc(e.message) + '</pre></div>')); }
 });
 
 // ── 暂存列表页 ──
@@ -1531,7 +1598,10 @@ function serveEditor(slug, res) {
   body += '<div class="form-group"><label>Slug（文件名）</label><input type="text" name="slug" value="' + esc(slug || "") + '" placeholder="留空自动生成"' + (slug ? ' readonly style="background:#f1f5f9"' : '') + '><span class="help-text">作为 .md 文件名，留空则自动生成哈希值，如 post-k5x2m8a1</span></div>';
   // 日期
   var defaultDate = data.published ? String(data.published).slice(0, 10) : new Date().toISOString().slice(0, 10);
-  body += '<div class="form-group"><label>发布日期 *</label><input type="date" name="publishedDate" value="' + esc(defaultDate) + '"></div>';
+  body += '<div class="form-group"><label>发布日期（自动同步）</label><div style="display:flex;align-items:center;gap:6px;padding:8px 0">';
+  body += '<span id="sysDate" style="font-size:20px;font-weight:600;font-family:\'JetBrains Mono\',monospace;color:#1a1a1a;letter-spacing:1px">' + defaultDate + '</span>';
+  body += '<span style="color:#94a3b8;font-size:12px;margin-left:4px">📅 实时同步系统日期</span>';
+  body += '</div></div>';
   body += '<div class="form-group"><label>发布时间（系统同步）</label><div style="display:flex;align-items:center;gap:6px;padding:8px 0">';
   body += '<span id="sysTime" style="font-size:20px;font-weight:600;font-family:\'JetBrains Mono\',monospace;color:#1a1a1a;letter-spacing:1px">--:--:--</span>';
   body += '<span style="color:#94a3b8;font-size:12px;margin-left:4px">⏱ 实时同步系统时钟</span>';
@@ -1577,6 +1647,7 @@ function serveEditor(slug, res) {
   body += '<div class="editor-layout"><div class="form-group editor" style="padding:0">';
   body += '<div class="editor-toolbar">';
   body += '<button type="button" class="btn btn-ghost btn-sm" onclick="toggleBodyUpload()">📷 插入图片</button>';
+  body += '<button type="button" class="btn btn-ghost btn-sm" onclick="insertLink()">🔗 插入链接</button>';
   body += '</div>';
   body += '<div id="bodyUploadPanel" style="display:none;padding:0 10px 6px">';
   body += '<div class="body-upload-zone" id="bodyUploadZone" onclick="document.getElementById(\'bodyFileInput\').click()">';
@@ -1615,12 +1686,14 @@ app.get("/editor.js", function(req, res) {
     'function initEditor(cfg) {',
     '  var pv = false;',
     '',
-    '  // 系统时钟',
+    '  // 系统时钟 + 日期',
     '  var sysTimeEl = document.getElementById("sysTime");',
+    '  var sysDateEl = document.getElementById("sysDate");',
     '  function pad2(n) { return String(n).padStart(2, "0"); }',
     '  function syncClock() {',
     '    var now = new Date();',
     '    sysTimeEl.textContent = pad2(now.getHours()) + ":" + pad2(now.getMinutes()) + ":" + pad2(now.getSeconds());',
+    '    if (sysDateEl) sysDateEl.textContent = now.getFullYear() + "-" + pad2(now.getMonth()+1) + "-" + pad2(now.getDate());',
     '  }',
     '  syncClock(); setInterval(syncClock, 1000);',
     '',
@@ -1713,6 +1786,21 @@ app.get("/editor.js", function(req, res) {
     '  }',
     '  window.toggleBodyUpload = toggleBodyUpload;',
     '',
+    '  // 插入链接',
+    '  function insertLink() {',
+    '    var text = prompt("链接文字:", "链接文字");',
+    '    if (text === null) return;',
+    '    var url = prompt("链接 URL:", "https://");',
+    '    if (!url) return;',
+    '    var md = "[" + text + "](" + url + ")";',
+    '    var ed = document.getElementById("editor");',
+    '    var s = ed.selectionStart, e = ed.selectionEnd;',
+    '    ed.value = ed.value.slice(0, s) + md + ed.value.slice(e);',
+    '    ed.selectionStart = ed.selectionEnd = s + md.length;',
+    '    ed.focus();',
+    '  }',
+    '  window.insertLink = insertLink;',
+    '',
     '  var bodyUz = document.getElementById("bodyUploadZone");',
     '  var bodyFi = document.getElementById("bodyFileInput");',
     '  bodyUz.addEventListener("dragover", function(e) { e.preventDefault(); bodyUz.classList.add("dragover"); });',
@@ -1758,7 +1846,9 @@ app.get("/editor.js", function(req, res) {
     '    var action = submitBtn ? submitBtn.value : "push";',
     '    setLoading(submitBtn, true);',
     '    var fd = new FormData(e.target);',
-    '    var dateVal = fd.get("publishedDate") || new Date().toISOString().slice(0, 10);',
+    '    var now = new Date();',
+    '    var pad2 = function(n){return String(n).padStart(2,"0")};',
+    '    var dateVal = now.getFullYear()+"-"+pad2(now.getMonth()+1)+"-"+pad2(now.getDate());',
     '    var b = {',
     '      title: fd.get("title"),',
     '      slug: fd.get("slug"),',
@@ -1966,6 +2056,122 @@ app.delete("/api/dynamic/:slug", rateLimit(30, 60000), async function(req, res) 
   }
 });
 
+// ── 新建动态页 ──
+var DYNAMIC_DIR = path.join(PROJECT_ROOT, "src", "content", "dynamic");
+
+app.get("/new-dynamic", rateLimit(30, 60000), function(req, res) {
+  var body = '<div class="app-shell">';
+  body += '<header class="app-header">';
+  body += '<div class="header-brand">';
+  body += '<div class="brand-mark"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 5 L38 22 L55 28 L38 34 L32 52 L26 34 L9 28 L26 22 Z" fill="white"/></svg></div>';
+  body += '<div class="header-brand-text"><strong>Aurora</strong><span>新建动态</span></div>';
+  body += '</div>';
+  body += '<div class="header-actions"><a href="/" class="mini-btn">🏠 返回后台</a></div>';
+  body += '</header>';
+  body += '<div class="app-main" style="flex-direction:column"><div class="main-column" style="width:100%">';
+  body += '<div class="list-card"><div class="list-card-body">';
+  body += '<form id="dynamicForm"><div class="form-grid">';
+  body += '<div class="form-group full"><label>动态内容 *</label>';
+  body += '<textarea name="content" id="editor" style="min-height:200px;width:100%;padding:12px;border:1px solid #e2e8f0;border-radius:8px;font-family:inherit;font-size:14px;line-height:1.7;resize:vertical" placeholder="写下你想说的...支持 Markdown 和图片语法 ![alt](url)"></textarea></div>';
+  body += '<div class="form-group"><label>发布时间（自动同步）</label><div style="display:flex;align-items:center;gap:12px;padding:8px 0">';
+  body += '<span id="sysDate" style="font-size:20px;font-weight:600;font-family:\'JetBrains Mono\',monospace;color:#1a1a1a;letter-spacing:1px">--</span>';
+  body += '<span id="sysTime" style="font-size:20px;font-weight:600;font-family:\'JetBrains Mono\',monospace;color:#1a1a1a;letter-spacing:1px">--:--:--</span>';
+  body += '<span style="color:#94a3b8;font-size:12px">⏱ 实时同步</span>';
+  body += '</div></div>';
+  body += '<div class="form-group"><label>位置（可选）</label>';
+  body += '<input type="text" name="location" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px" placeholder="如：日本东京"></div>';
+  body += '<div class="form-group"><label><input type="checkbox" name="pinned"> 置顶</label></div>';
+  body += '</div>';
+  body += '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">';
+  body += '<div class="body-upload-zone" id="bodyUploadZone" onclick="document.getElementById(\'bodyFileInput\').click()" style="flex:1;min-width:200px">';
+  body += '<input type="file" id="bodyFileInput" accept="image/*">';
+  body += '📷 点击或拖拽图片到此处上传</div>';
+  body += '<button type="button" class="btn btn-ghost" onclick="insertLink()" style="align-self:center">🔗 插入链接</button>';
+  body += '</div>';
+  body += '<div class="form-actions"><button type="submit" class="btn btn-primary">保存并推送</button>';
+  body += '<a href="/" class="btn btn-ghost">取消</a></div>';
+  body += '</form></div></div></div></div>';
+  body += '<script src="/dynamic-editor.js"></script>';
+  res.send(wrapHTML("新建动态", body));
+});
+
+// ── 动态编辑器 JS ──
+app.get("/dynamic-editor.js", function(req, res) {
+  res.setHeader("Content-Type", "application/javascript");
+  res.send([
+    '// 时钟同步',
+    'var sysTimeEl=document.getElementById("sysTime"),sysDateEl=document.getElementById("sysDate");',
+    'function pad2(n){return String(n).padStart(2,"0")}',
+    'function syncClock(){var now=new Date();',
+    'sysTimeEl.textContent=pad2(now.getHours())+":"+pad2(now.getMinutes())+":"+pad2(now.getSeconds());',
+    'sysDateEl.textContent=now.getFullYear()+"-"+pad2(now.getMonth()+1)+"-"+pad2(now.getDate());}',
+    'syncClock();setInterval(syncClock,1000);',
+    '// 插入链接',
+    'function insertLink(){var text=prompt("链接文字:","链接文字");if(text===null)return;',
+    'var url=prompt("链接 URL:","https://");if(!url)return;',
+    'var md="["+text+"]("+url+")";var ed=document.getElementById("editor");',
+    'var s=ed.selectionStart,e=ed.selectionEnd;',
+    'ed.value=ed.value.slice(0,s)+md+ed.value.slice(e);',
+    'ed.selectionStart=ed.selectionEnd=s+md.length;ed.focus();}',
+    '// 表单提交',
+    'document.getElementById("dynamicForm").addEventListener("submit",function(e){',
+    'e.preventDefault();var btn=e.submitter;setLoading(btn,true);',
+    'var fd=new FormData(e.target);',
+    'var b={content:fd.get("content"),location:fd.get("location")||"",pinned:fd.has("pinned")};',
+    'fetch("/api/dynamic",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)})',
+    '.then(function(r){return r.json()}).then(function(j){',
+    'if(j.ok){showToast("\\u2705 "+j.message,"success",3000);setTimeout(function(){location.href="/"},1200)}',
+    'else{showToast("\\u274c "+(j.error||"保存失败"),"error",5000);setLoading(btn,false)}}',
+    ').catch(function(){showToast("\\u274c 网络错误","error");setLoading(btn,false)})});',
+    '(function(){var uz=document.getElementById("bodyUploadZone");var fi=document.getElementById("bodyFileInput");',
+    'uz.addEventListener("dragover",function(e){e.preventDefault();uz.classList.add("dragover")});',
+    'uz.addEventListener("dragleave",function(){uz.classList.remove("dragover")});',
+    'uz.addEventListener("drop",function(e){e.preventDefault();uz.classList.remove("dragover");if(e.dataTransfer.files.length)uploadBodyImage(e.dataTransfer.files[0])});',
+    'fi.addEventListener("change",function(){if(fi.files.length)uploadBodyImage(fi.files[0]);fi.value=""});',
+    'function uploadBodyImage(file){var fd=new FormData();fd.append("file",file);uz.textContent="上传中...";',
+    'fetch("/api/upload",{method:"POST",body:fd}).then(function(r){return r.json()}).then(function(j){',
+    'if(j.ok){var ed=document.getElementById("editor");var md="\\n!["+j.filename+"]("+j.publicPath+")\\n";',
+    'var s=ed.selectionStart,e=ed.selectionEnd;ed.value=ed.value.slice(0,s)+md+ed.value.slice(e);',
+    'ed.selectionStart=ed.selectionEnd=s+md.length;ed.focus();showToast("\\u2705 已插入图片","success");',
+    'uz.innerHTML=\'<input type="file" id="bodyFileInput" accept="image/*">点击或拖拽图片到此处上传，自动插入到正文光标位置\';',
+    'document.getElementById("bodyFileInput").addEventListener("change",function(){if(this.files.length)uploadBodyImage(this.files[0]);this.value=""});',
+    '}else{showToast("\\u274c "+(j.error||"上传失败"),"error");uz.innerHTML=\'<input type="file" id="bodyFileInput" accept="image/*">点击或拖拽图片到此处上传\';',
+    'document.getElementById("bodyFileInput").addEventListener("change",function(){if(this.files.length)uploadBodyImage(this.files[0]);this.value=""});',
+    '}}).catch(function(){showToast("\\u274c 网络错误","error")})}})();'
+  ].join("\n"));
+});
+
+// ── API: 保存动态 ──
+app.post("/api/dynamic", rateLimit(30, 60000), async function(req, res) {
+  try {
+    var content = req.body.content;
+    var location = req.body.location || "";
+    var pinned = req.body.pinned || false;
+    if (!content || !content.trim()) return res.json({ ok: false, error: "请输入动态内容" });
+    if (!fs.existsSync(DYNAMIC_DIR)) fs.mkdirSync(DYNAMIC_DIR, { recursive: true });
+
+    var now = new Date();
+    var sh = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Shanghai" }));
+    var y = sh.getFullYear(), mo = String(sh.getMonth()+1).padStart(2,"0"), d = String(sh.getDate()).padStart(2,"0");
+    var hh = String(sh.getHours()).padStart(2,"0"), mm = String(sh.getMinutes()).padStart(2,"0"), ss = String(sh.getSeconds()).padStart(2,"0");
+    var timestamp = y+"-"+mo+"-"+d+" "+hh+":"+mm+":"+ss;
+    var slug = y+"-"+mo+"-"+d+"-"+hh+mm+ss;
+    var filePath = path.join(DYNAMIC_DIR, slug+".md");
+    if (fs.existsSync(filePath)) return res.json({ ok: false, error: "文件已存在，请稍后重试" });
+
+    var fm = "---\npublished: "+timestamp+"\n"+(pinned?"pinned: true\n":"")+(location?"location: "+location+"\n":"")+"---\n\n"+content.trim()+"\n";
+    fs.writeFileSync(filePath, fm, "utf-8");
+
+    await git.add(".");
+    await git.commit("📝 新建动态: "+slug);
+    await git.push("origin", currentBranch);
+    res.json({ ok: true, message: "动态已保存并推送", slug: slug });
+  } catch(e) {
+    console.error("Save dynamic error:", e);
+    res.json({ ok: false, error: e.message });
+  }
+});
+
 // ── API: 单篇推送 ──
 app.post("/api/staging/push-single", rateLimit(10, 60000), async function(req, res) {
   try {
@@ -2008,13 +2214,18 @@ app.post("/api/staging/batch-push", rateLimit(5, 60000), async function(req, res
   }
 });
 
-// ── API: 移除暂存 ──
+// ── API: 移除暂存（同时删除文件） ──
 app.post("/api/staging/remove", rateLimit(30, 60000), function(req, res) {
   try {
     var slug = sanitizeSlug(req.body.slug);
     if (!validateSlug(slug)) return res.json({ ok: false, error: "无效的 slug" });
+    // 删除实际文件
+    var filePath = safeFindPostFile(slug);
+    if (filePath) {
+      fs.unlinkSync(filePath);
+    }
     removeFromStaging(slug);
-    res.json({ ok: true, message: "已从暂存列表移除" });
+    res.json({ ok: true, message: "已从暂存列表移除并删除文件" });
   } catch (e) {
     res.json({ ok: false, error: e.message });
   }
@@ -2793,6 +3004,7 @@ app.get("/config/announcement", rateLimit(30, 60000), function(req, res) {
 // ── 关于我管理页（直接进入编辑页，不带导航栏） ──
 app.get("/config/about", rateLimit(30, 60000), function(req, res) {
   var cfg = loadSiteConfig();
+  var aboutContent = cfg.about || "";
 
   var body = '<div class="container" style="max-width:920px;">';
   body += '<header><h1>关于我</h1>';
@@ -2801,7 +3013,7 @@ app.get("/config/about", rateLimit(30, 60000), function(req, res) {
 
   body += '<div style="background:#fff;border:1px solid #e8e8e8;border-radius:12px;padding:20px;box-shadow:0 12px 30px rgba(15,23,42,.04)">';
   body += '<div class="form-group"><label>个人介绍 (Markdown)</label>';
-  body += '<textarea id="aboutContent" rows="15" style="min-height:300px;resize:vertical;font-family:inherit;width:100%;padding:12px;border:1px solid #e2e8f0;border-radius:8px">' + (cfg.about || '') + '</textarea></div>';
+  body += '<textarea id="aboutContent" rows="15" style="min-height:300px;resize:vertical;font-family:inherit;width:100%;padding:12px;border:1px solid #e2e8f0;border-radius:8px" placeholder="在这里写下你的个人介绍...">' + esc(aboutContent) + '</textarea></div>';
   body += '</div>';
 
   body += '<div style="display:flex;justify-content:flex-end;margin-top:16px"><button class="btn btn-success" onclick="saveAbout()">保存</button></div>';
