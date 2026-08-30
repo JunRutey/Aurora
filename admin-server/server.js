@@ -11,7 +11,15 @@ const POSTS_DIR = path.join(PROJECT_ROOT, "src", "content", "posts");
 const IMAGES_DIR = path.join(PROJECT_ROOT, "src", "assets", "images");
 const PUBLIC_IMAGES_DIR = path.join(PROJECT_ROOT, "public", "assets", "images");
 const GALLERY_DIR = path.join(PROJECT_ROOT, "public", "gallery");
+const CONTENT_DIR = path.join(PROJECT_ROOT, "src", "content");
 const GALLERY_CONFIG_FILE = path.join(PROJECT_ROOT, "src", "config", "galleryConfig.ts");
+const CONFIG_DIR = path.join(PROJECT_ROOT, "src", "config");
+const WALLPAPER_DIR = path.join(IMAGES_DIR, "CustomWallpaper");
+const MOBILE_WALLPAPER_DIR = path.join(IMAGES_DIR, "MobileWallpaper");
+const VIDEO_DIR = path.join(PROJECT_ROOT, "public", "assets", "videos");
+const MUSIC_DIR = path.join(PROJECT_ROOT, "public", "assets", "music");
+const MUSIC_COVER_DIR = path.join(MUSIC_DIR, "cover");
+const SITE_CONFIG_FILE = path.join(__dirname, "site-config.json");
 const STAGING_FILE = path.join(__dirname, ".staging.json");
 const git = simpleGit(PROJECT_ROOT);
 let currentBranch = "main";
@@ -40,6 +48,7 @@ var upload = multer({
     cb(/^image\/(jpeg|png|gif|webp|avif|svg\+xml)$/.test(file.mimetype) ? null : new Error("只允许上传图片文件"), true);
   }
 });
+var imageUpload = upload;
 
 // ── Gallery 图片上传 ──
 var galleryStorage = multer.diskStorage({
@@ -69,6 +78,63 @@ var galleryUpload = multer({
   limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: function(req, file, cb) {
     cb(/^image\/(jpeg|png|gif|webp|avif|svg\+xml)$/.test(file.mimetype) ? null : new Error("只允许上传图片文件"), true);
+  }
+});
+
+// ── 视频上传 ──
+var videoUpload = multer({
+  storage: multer.diskStorage({
+    destination: function(req, file, cb) {
+      if (!fs.existsSync(VIDEO_DIR)) fs.mkdirSync(VIDEO_DIR, { recursive: true });
+      cb(null, VIDEO_DIR);
+    },
+    filename: function(req, file, cb) {
+      var ext = path.extname(file.originalname);
+      var base = path.basename(file.originalname, ext).toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff_-]/g, "-").replace(/-+/g, "-");
+      cb(null, base + "-" + Date.now() + ext);
+    }
+  }),
+  limits: { fileSize: 100 * 1024 * 1024 },
+  fileFilter: function(req, file, cb) {
+    cb(/^video\/(mp4|webm|ogg|mov)$/.test(file.mimetype) || /\.(mp4|webm|ogg|mov)$/i.test(file.originalname) ? null : new Error("只允许上传视频文件"), true);
+  }
+});
+
+// ── 音乐上传 ──
+var musicUpload = multer({
+  storage: multer.diskStorage({
+    destination: function(req, file, cb) {
+      if (!fs.existsSync(MUSIC_DIR)) fs.mkdirSync(MUSIC_DIR, { recursive: true });
+      cb(null, MUSIC_DIR);
+    },
+    filename: function(req, file, cb) {
+      var ext = path.extname(file.originalname);
+      var base = path.basename(file.originalname, ext).toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff_-]/g, "-").replace(/-+/g, "-");
+      cb(null, base + "-" + Date.now() + ext);
+    }
+  }),
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: function(req, file, cb) {
+    cb(/^audio\/(mpeg|mp3|ogg|wav|flac|aac|m4a)$/.test(file.mimetype) || /\.(mp3|ogg|wav|flac|aac|m4a)$/i.test(file.originalname) ? null : new Error("只允许上传音频文件"), true);
+  }
+});
+
+// ── 音乐封面上传 ──
+var musicCoverUpload = multer({
+  storage: multer.diskStorage({
+    destination: function(req, file, cb) {
+      if (!fs.existsSync(MUSIC_COVER_DIR)) fs.mkdirSync(MUSIC_COVER_DIR, { recursive: true });
+      cb(null, MUSIC_COVER_DIR);
+    },
+    filename: function(req, file, cb) {
+      var ext = path.extname(file.originalname);
+      var base = path.basename(file.originalname, ext).toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff_-]/g, "-").replace(/-+/g, "-");
+      cb(null, base + "-" + Date.now() + ext);
+    }
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: function(req, file, cb) {
+    cb(/^image\/(jpeg|png|gif|webp|avif)$/.test(file.mimetype) ? null : new Error("只允许上传图片文件"), true);
   }
 });
 
@@ -188,6 +254,97 @@ function sanitizeForJS(str) {
     .replace(/\r/g, "\\r")
     .replace(/</g, "\\x3c")
     .replace(/>/g, "\\x3e");
+}
+
+// ── 站点配置管理 ──
+function loadSiteConfig() {
+  try {
+    return JSON.parse(fs.readFileSync(SITE_CONFIG_FILE, "utf-8"));
+  } catch (e) {
+    return {
+      wallpapers: { desktop: [], mobile: [] },
+      video: "",
+      music: [],
+      announcement: { title: "", content: "", closable: true, link: { enable: false, text: "", url: "", external: false } },
+      fonts: [],
+      about: ""
+    };
+  }
+}
+function saveSiteConfig(cfg) {
+  fs.writeFileSync(SITE_CONFIG_FILE, JSON.stringify(cfg, null, 2), "utf-8");
+}
+
+// ── TypeScript 配置文件同步 ──
+function syncWallpaperToTS(cfg) {
+  var file = path.join(CONFIG_DIR, "backgroundWallpaper.ts");
+  try {
+    var content = fs.readFileSync(file, "utf-8");
+    var desktopPaths = cfg.wallpapers.desktop.map(function(p) { return '\t\t\t"' + p + '"'; });
+    content = content.replace(
+      /desktop:\s*\[[\s\S]*?\]/,
+      "desktop: [\n" + desktopPaths.join(",\n") + ",\n\t\t]"
+    );
+    var mobilePaths = cfg.wallpapers.mobile.map(function(p) { return '\t\t\t"' + p + '"'; });
+    content = content.replace(
+      /mobile:\s*\[[\s\S]*?\]/,
+      "mobile: [\n" + mobilePaths.join(",\n") + ",\n\t\t]"
+    );
+    if (cfg.video) {
+      var videoPath = cfg.video;
+      content = content.replace(
+        /playerUrl:\s*`[^`]*`/,
+        'playerUrl: `${process.env.VERCEL ? "/" : "/Aurora/"}' + videoPath.replace(/^\//, '') + '`'
+      );
+    }
+    fs.writeFileSync(file, content, "utf-8");
+  } catch (e) {
+    console.error("Sync wallpaper TS error:", e.message);
+  }
+}
+
+function syncMusicToTS(cfg) {
+  var file = path.join(CONFIG_DIR, "musicConfig.ts");
+  try {
+    var content = fs.readFileSync(file, "utf-8");
+    var playlist = cfg.music.map(function(m) {
+      return '\t\t{\n\t\t\tname: "' + (m.name || "").replace(/"/g, '\\"') + '",\n' +
+        '\t\t\tartist: "' + (m.artist || "").replace(/"/g, '\\"') + '",\n' +
+        '\t\t\turl: "' + (m.url || "") + '",\n' +
+        '\t\t\tcover: "' + (m.cover || "") + '",\n' +
+        '\t\t\tlrc: "' + (m.lrc || "") + '",\n' +
+        '\t\t}';
+    });
+    content = content.replace(
+      /playlist:\s*\[[\s\S]*?\](?=\s*\})/,
+      "playlist: [\n" + playlist.join(",\n") + ",\n\t\t]"
+    );
+    fs.writeFileSync(file, content, "utf-8");
+  } catch (e) {
+    console.error("Sync music TS error:", e.message);
+  }
+}
+
+function syncAnnouncementToTS(cfg) {
+  var file = path.join(CONFIG_DIR, "announcementConfig.ts");
+  try {
+    var a = cfg.announcement;
+    var content = 'import type { AnnouncementConfig } from "../types/announcementConfig";\n\n';
+    content += 'export const announcementConfig: AnnouncementConfig = {\n';
+    content += '\ttitle: "' + (a.title || "").replace(/"/g, '\\"') + '",\n';
+    content += '\tcontent: "' + (a.content || "").replace(/"/g, '\\"') + '",\n';
+    content += '\tclosable: ' + (a.closable !== false) + ',\n';
+    content += '\tlink: {\n';
+    content += '\t\tenable: ' + (a.link && a.link.enable) + ',\n';
+    content += '\t\ttext: "' + ((a.link && a.link.text) || "").replace(/"/g, '\\"') + '",\n';
+    content += '\t\turl: "' + ((a.link && a.link.url) || "").replace(/"/g, '\\"') + '",\n';
+    content += '\t\texternal: ' + (a.link && !!a.link.external) + ',\n';
+    content += '\t},\n';
+    content += '};\n';
+    fs.writeFileSync(file, content, "utf-8");
+  } catch (e) {
+    console.error("Sync announcement TS error:", e.message);
+  }
 }
 
 // ── HTML helpers ──
@@ -510,7 +667,15 @@ var icEdit = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-
 var icDash = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>';
 var icPackage = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16.5 9.4l-9-5.19M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>';
 var icInbox = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg>';
+var icCog = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>';
 var icRefresh = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>';
+var icImage = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
+var icVideo = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>';
+var icMusic = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+var icAnnounce = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
+var icFont = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>';
+var icUser = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+var icSettings = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
 
 // ── API: 上传图片 ──
 app.post("/api/upload", rateLimit(30, 60000), function(req, res) {
@@ -582,6 +747,177 @@ app.get("/api/thumb/*", rateLimit(120, 60000), function(req, res) {
   }
 });
 
+// ── 站点配置 API ──
+app.get("/api/config/wallpapers", rateLimit(30, 60000), function(req, res) {
+  var cfg = loadSiteConfig();
+  var desktop = cfg.wallpapers.desktop.map(function(p) {
+    var name = path.basename(p);
+    return { path: p, name: name, exists: fs.existsSync(path.join(PROJECT_ROOT, "public", p)) || fs.existsSync(path.join(IMAGES_DIR, name)) };
+  });
+  var mobile = cfg.wallpapers.mobile.map(function(p) {
+    var name = path.basename(p);
+    return { path: p, name: name, exists: fs.existsSync(path.join(PROJECT_ROOT, "public", p)) || fs.existsSync(path.join(IMAGES_DIR, name)) };
+  });
+  res.json({ ok: true, desktop: desktop, mobile: mobile });
+});
+
+app.post("/api/config/wallpaper/upload", rateLimit(30, 60000), imageUpload.single("file"), function(req, res) {
+  if (!req.file) return res.json({ ok: false, error: "没有文件" });
+  var relPath = "assets/images/" + req.file.filename;
+  var target = path.join(PUBLIC_IMAGES_DIR, req.file.filename);
+  try {
+    if (!fs.existsSync(path.dirname(target))) fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(req.file.path, target);
+    fs.unlinkSync(req.file.path);
+  } catch (e) { console.error("Copy wallpaper error:", e.message); }
+  var cfg = loadSiteConfig();
+  var type = req.body.type || "desktop";
+  if (type === "mobile") cfg.wallpapers.mobile.push("/" + relPath);
+  else cfg.wallpapers.desktop.push("/" + relPath);
+  saveSiteConfig(cfg);
+  syncWallpaperToTS(cfg);
+  res.json({ ok: true, path: "/" + relPath });
+});
+
+app.post("/api/config/wallpaper/delete", rateLimit(30, 60000), function(req, res) {
+  var p = req.body.path;
+  if (!p) return res.json({ ok: false, error: "缺少路径" });
+  var cfg = loadSiteConfig();
+  var i1 = cfg.wallpapers.desktop.indexOf(p);
+  if (i1 !== -1) cfg.wallpapers.desktop.splice(i1, 1);
+  var i2 = cfg.wallpapers.mobile.indexOf(p);
+  if (i2 !== -1) cfg.wallpapers.mobile.splice(i2, 1);
+  saveSiteConfig(cfg);
+  syncWallpaperToTS(cfg);
+  var filePath = path.join(PROJECT_ROOT, "public", p.replace(/^\//, ""));
+  if (fs.existsSync(filePath)) { try { fs.unlinkSync(filePath); } catch(e) {} }
+  res.json({ ok: true });
+});
+
+app.post("/api/config/wallpaper/reorder", rateLimit(30, 60000), function(req, res) {
+  var cfg = loadSiteConfig();
+  if (req.body.desktop) cfg.wallpapers.desktop = req.body.desktop;
+  if (req.body.mobile) cfg.wallpapers.mobile = req.body.mobile;
+  saveSiteConfig(cfg);
+  syncWallpaperToTS(cfg);
+  res.json({ ok: true });
+});
+
+app.get("/api/config/video", rateLimit(30, 60000), function(req, res) {
+  var cfg = loadSiteConfig();
+  var files = scanFiles(VIDEO_DIR, [".mp4", ".webm", ".ogg", ".mov"]);
+  res.json({ ok: true, video: cfg.video, files: files.map(function(f) { return { name: f.name, size: f.size }; }) });
+});
+
+app.post("/api/config/video/upload", rateLimit(30, 60000), videoUpload.single("file"), function(req, res) {
+  if (!req.file) return res.json({ ok: false, error: "没有文件" });
+  res.json({ ok: true, filename: req.file.filename });
+});
+
+app.post("/api/config/video/select", rateLimit(30, 60000), function(req, res) {
+  var filename = req.body.filename;
+  if (!filename) return res.json({ ok: false, error: "缺少文件名" });
+  var cfg = loadSiteConfig();
+  cfg.video = "/assets/videos/" + filename;
+  saveSiteConfig(cfg);
+  syncWallpaperToTS(cfg);
+  res.json({ ok: true });
+});
+
+app.post("/api/config/video/delete", rateLimit(30, 60000), function(req, res) {
+  var filename = req.body.filename;
+  if (!filename) return res.json({ ok: false, error: "缺少文件名" });
+  var cfg = loadSiteConfig();
+  if (cfg.video === "/assets/videos/" + filename) { cfg.video = ""; saveSiteConfig(cfg); syncWallpaperToTS(cfg); }
+  var filePath = path.join(VIDEO_DIR, filename);
+  if (fs.existsSync(filePath)) { try { fs.unlinkSync(filePath); } catch(e) {} }
+  res.json({ ok: true });
+});
+
+app.get("/api/config/music", rateLimit(30, 60000), function(req, res) {
+  var cfg = loadSiteConfig();
+  var files = scanFiles(MUSIC_DIR, [".mp3", ".ogg", ".wav", ".flac", ".aac", ".m4a"]);
+  res.json({ ok: true, music: cfg.music, files: files.map(function(f) { return { name: f.name, size: f.size }; }) });
+});
+
+app.post("/api/config/music/upload", rateLimit(30, 60000), musicUpload.single("file"), function(req, res) {
+  if (!req.file) return res.json({ ok: false, error: "没有文件" });
+  res.json({ ok: true, filename: req.file.filename });
+});
+
+app.post("/api/config/music/update", rateLimit(30, 60000), function(req, res) {
+  var cfg = loadSiteConfig();
+  cfg.music = req.body.music || [];
+  saveSiteConfig(cfg);
+  syncMusicToTS(cfg);
+  res.json({ ok: true });
+});
+
+app.post("/api/config/music/delete", rateLimit(30, 60000), function(req, res) {
+  var filename = req.body.filename;
+  if (!filename) return res.json({ ok: false, error: "缺少文件名" });
+  var cfg = loadSiteConfig();
+  cfg.music = cfg.music.filter(function(m) { return m.url !== "/assets/music/" + filename; });
+  saveSiteConfig(cfg);
+  syncMusicToTS(cfg);
+  var filePath = path.join(MUSIC_DIR, filename);
+  if (fs.existsSync(filePath)) { try { fs.unlinkSync(filePath); } catch(e) {} }
+  res.json({ ok: true });
+});
+
+app.post("/api/config/music/cover-upload", rateLimit(30, 60000), musicCoverUpload.single("file"), function(req, res) {
+  if (!req.file) return res.json({ ok: false, error: "没有文件" });
+  res.json({ ok: true, filename: req.file.filename, path: "/assets/music/cover/" + req.file.filename });
+});
+
+app.get("/api/config/announcement", rateLimit(30, 60000), function(req, res) {
+  var cfg = loadSiteConfig();
+  res.json({ ok: true, announcement: cfg.announcement });
+});
+
+app.post("/api/config/announcement", rateLimit(30, 60000), function(req, res) {
+  var cfg = loadSiteConfig();
+  cfg.announcement = req.body.announcement || cfg.announcement;
+  saveSiteConfig(cfg);
+  syncAnnouncementToTS(cfg);
+  res.json({ ok: true });
+});
+
+app.get("/api/config/about", rateLimit(30, 60000), function(req, res) {
+  var cfg = loadSiteConfig();
+  res.json({ ok: true, about: cfg.about || "" });
+});
+
+app.post("/api/config/about", rateLimit(30, 60000), function(req, res) {
+  var cfg = loadSiteConfig();
+  cfg.about = req.body.about || "";
+  saveSiteConfig(cfg);
+  res.json({ ok: true });
+});
+
+app.get("/api/config/fonts", rateLimit(30, 60000), function(req, res) {
+  var cfg = loadSiteConfig();
+  res.json({ ok: true, fonts: cfg.fonts || [] });
+});
+
+app.post("/api/config/fonts", rateLimit(30, 60000), function(req, res) {
+  var cfg = loadSiteConfig();
+  cfg.fonts = req.body.fonts || [];
+  saveSiteConfig(cfg);
+  res.json({ ok: true });
+});
+
+app.post("/api/config/publish", rateLimit(10, 60000), async function(req, res) {
+  try {
+    await git.add(".");
+    await git.commit("chore: 更新站点配置");
+    await git.push("origin", currentBranch);
+    res.json({ ok: true, message: "已推送到仓库" });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
 // ── Dashboard 列表页 ──
 app.get("/", function(req, res) {
   try {
@@ -642,9 +978,14 @@ app.get("/", function(req, res) {
     body += '<div class="dashboard-side">';
     body += '<div class="widget"><div class="widget-header">快捷操作</div><div class="widget-body">';
     body += '<a href="/new" class="widget-link">' + icEdit + ' 新建文章</a>';
-    body += '<a href="/gallery-admin" class="widget-link">' + icEdit + ' 📸 相册管理</a>';
+    body += '<a href="/gallery-admin" class="widget-link">' + icImage + ' 相册管理</a>';
     body += '<a href="/" class="widget-link">' + icRefresh + ' 刷新列表</a>';
     body += '<a href="/staging" class="widget-link">' + icInbox + ' 暂存列表' + (stagedCount > 0 ? ' <span style="background:#f59e0b;color:#fff;font-size:11px;padding:1px 6px;border-radius:8px;margin-left:auto">' + stagedCount + '</span>' : '') + '</a>';
+    body += '<a href="/config/wallpaper" class="widget-link">' + icImage + ' 封面壁纸</a>';
+    body += '<a href="/config/video" class="widget-link">' + icVideo + ' 背景视频</a>';
+    body += '<a href="/config/music" class="widget-link">' + icMusic + ' 背景音乐</a>';
+    body += '<a href="/config/announcement" class="widget-link">' + icAnnounce + ' 公告管理</a>';
+    body += '<a href="/config/about" class="widget-link">' + icUser + ' 关于我</a>';
     body += '</div></div>';
 
     // ── 暂存概览 widget ──
@@ -1610,6 +1951,266 @@ app.post("/api/gallery/:id/urls", rateLimit(30, 60000), function(req, res) {
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════
+//  站点配置 (Site Config) — 壁纸/视频/音乐/公告/友链/字体/关于我
+// ═══════════════════════════════════════════════════════════════════════
+
+// Path helpers
+var siteConfigPath = path.join(CONTENT_DIR, "site-config.md");
+function readSiteConfig() {
+  try { return fs.readFileSync(siteConfigPath, "utf-8"); } catch(e) { return ""; }
+}
+function writeSiteConfig(content) {
+  fs.writeFileSync(siteConfigPath, content, "utf-8");
+}
+
+function parseSiteConfig(text) {
+  var cfg = {
+    wallpaper: "", video: "", bgmSong: "", bgmId: "",
+    announcement: "", friends: [], about: "", fonts: []
+  };
+  if (!text) return cfg;
+
+  var sections = text.split("\n## ").slice(1);
+  sections.forEach(function(section) {
+    var lines = section.split("\n");
+    var title = lines[0].trim().toLowerCase();
+    var body = lines.slice(1).join("\n").trim();
+
+    if (title === "wallpaper") {
+      var m = body.match(/url:\s*(.*)/);
+      if (m) cfg.wallpaper = m[1].trim();
+    }
+    else if (title === "video") {
+      var m = body.match(/url:\s*(.*)/);
+      if (m) cfg.video = m[1].trim();
+    }
+    else if (title === "bgm") {
+      var ms = body.match(/song:\s*(.*)/);
+      var mi = body.match(/id:\s*(.*)/);
+      if (ms) cfg.bgmSong = ms[1].trim();
+      if (mi) cfg.bgmId = mi[1].trim();
+    }
+    else if (title === "announcement") {
+      cfg.announcement = body;
+    }
+    else if (title === "friends") {
+      var friends = [];
+      var lines = body.split("\n");
+      var current = null;
+      lines.forEach(function(line) {
+        var lm = line.match(/^name:\s*(.*)/);
+        var lu = line.match(/^url:\s*(.*)/);
+        var li = line.match(/^icon:\s*(.*)/);
+        var ld = line.match(/^desc:\s*(.*)/);
+        if (lm) { current = { name: lm[1].trim(), url: "", icon: "", desc: "" }; friends.push(current); }
+        if (lu && current) current.url = lu[1].trim();
+        if (li && current) current.icon = li[1].trim();
+        if (ld && current) current.desc = ld[1].trim();
+      });
+      cfg.friends = friends;
+    }
+    else if (title === "about") {
+      cfg.about = body;
+    }
+    else if (title === "fonts") {
+      var fonts = [];
+      var flines = body.split("\n");
+      var cf = null;
+      flines.forEach(function(fl) {
+        var fn = fl.match(/^name:\s*(.*)/);
+        var fu = fl.match(/^url:\s*(.*)/);
+        if (fn) { cf = { name: fn[1].trim(), url: "" }; fonts.push(cf); }
+        if (fu && cf) cf.url = fu[1].trim();
+      });
+      cfg.fonts = fonts;
+    }
+  });
+  return cfg;
+}
+
+function writeSiteConfigFromObj(cfg) {
+  var md = "";
+  md += "## Wallpaper\n\nurl: " + (cfg.wallpaper || "") + "\n";
+  md += "\n## Video\n\nurl: " + (cfg.video || "") + "\n";
+  md += "\n## BGM\n\nsong: " + (cfg.bgmSong || "") + "\nid: " + (cfg.bgmId || "") + "\n";
+  md += "\n## Announcement\n\n" + (cfg.announcement || "") + "\n";
+  md += "\n## Friends\n\n";
+  (cfg.friends || []).forEach(function(f) {
+    md += "- name: " + (f.name || "") + "\n  url: " + (f.url || "") + "\n  icon: " + (f.icon || "") + "\n  desc: " + (f.desc || "") + "\n";
+  });
+  md += "\n## About\n\n" + (cfg.about || "") + "\n";
+  md += "\n## Fonts\n\n";
+  (cfg.fonts || []).forEach(function(f) {
+    md += "- name: " + (f.name || "") + "\n  url: " + (f.url || "") + "\n";
+  });
+  writeSiteConfig(md);
+}
+
+// ── 站点配置页面 ──
+app.get("/site-config", rateLimit(30, 60000), function(req, res) {
+  try {
+    var cfg = parseSiteConfig(readSiteConfig());
+    var friendsJSON = JSON.stringify(cfg.friends);
+    var fontsJSON = JSON.stringify(cfg.fonts);
+
+    var body = '<div class="container">';
+    body += '<header><h1>' + icCog + ' 站点配置</h1>';
+    body += '<div><a href="/" class="btn btn-ghost">← 返回列表</a></div></header>';
+    body += '<form id="siteConfigForm" style="max-width:720px;margin:0 auto">';
+
+    // Wallpaper
+    body += '<div style="background:#fff;border-radius:10px;border:1px solid #e8e8e8;padding:20px;margin-bottom:16px">';
+    body += '<h3 style="margin:0 0 12px;font-size:15px">🖼️ 封面壁纸</h3>';
+    body += '<input type="text" id="wallpaper" value="' + esc(cfg.wallpaper) + '" placeholder="图片 URL" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px">';
+    if (cfg.wallpaper) {
+      body += '<div style="margin-top:8px;border-radius:6px;overflow:hidden;max-height:160px"><img src="' + esc(cfg.wallpaper) + '" style="width:100%;object-fit:cover;max-height:160px" onerror="this.style.display=\'none\'"></div>';
+    }
+    body += '</div>';
+
+    // Video
+    body += '<div style="background:#fff;border-radius:10px;border:1px solid #e8e8e8;padding:20px;margin-bottom:16px">';
+    body += '<h3 style="margin:0 0 12px;font-size:15px">🎬 背景视频</h3>';
+    body += '<input type="text" id="video" value="' + esc(cfg.video) + '" placeholder="视频 URL (mp4/webm)" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px">';
+    body += '</div>';
+
+    // BGM
+    body += '<div style="background:#fff;border-radius:10px;border:1px solid #e8e8f0;padding:20px;margin-bottom:16px">';
+    body += '<h3 style="margin:0 0 12px;font-size:15px">🎵 背景音乐</h3>';
+    body += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+    body += '<input type="text" id="bgmSong" value="' + esc(cfg.bgmSong) + '" placeholder="歌曲名" style="padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px">';
+    body += '<input type="text" id="bgmId" value="' + esc(cfg.bgmId) + '" placeholder="网易云 ID" style="padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px">';
+    body += '</div></div>';
+
+    // Announcement
+    body += '<div style="background:#fff;border-radius:10px;border:1px solid #e8e8e8;padding:20px;margin-bottom:16px">';
+    body += '<h3 style="margin:0 0 12px;font-size:15px">📢 公告</h3>';
+    body += '<textarea id="announcement" rows="3" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px;resize:vertical" placeholder="支持 Markdown">' + esc(cfg.announcement) + '</textarea>';
+    body += '</div>';
+
+    // Friends
+    body += '<div style="background:#fff;border-radius:10px;border:1px solid #e8e8f0;padding:20px;margin-bottom:16px">';
+    body += '<h3 style="margin:0 0 12px;font-size:15px">👥 友链</h3>';
+    body += '<div id="friendsList"></div>';
+    body += '<button type="button" class="btn btn-ghost btn-sm" onclick="addFriend()" style="margin-top:8px">+ 添加友链</button>';
+    body += '</div>';
+
+    // Fonts
+    body += '<div style="background:#fff;border-radius:10px;border:1px solid #e8e8f0;padding:20px;margin-bottom:16px">';
+    body += '<h3 style="margin:0 0 12px;font-size:15px">🔤 自定义字体</h3>';
+    body += '<p style="color:#94a3b8;font-size:12px;margin:0 0 8px">添加自定义字体 URL，保存后页面会自动加载</p>';
+    body += '<div id="fontsList"></div>';
+    body += '<button type="button" class="btn btn-ghost btn-sm" onclick="addFont()" style="margin-top:8px">+ 添加字体</button>';
+    body += '</div>';
+
+    // About
+    body += '<div style="background:#fff;border-radius:10px;border:1px solid #e8e8f0;padding:20px;margin-bottom:16px">';
+    body += '<h3 style="margin:0 0 12px;font-size:15px">👤 关于我</h3>';
+    body += '<textarea id="about" rows="5" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px;resize:vertical;font-family:inherit" placeholder="个人介绍，支持 Markdown">' + esc(cfg.about) + '</textarea>';
+    body += '</div>';
+
+    body += '<div style="text-align:right;margin-top:20px;padding-bottom:40px">';
+    body += '<button type="submit" class="btn btn-primary" id="saveBtn">💾 保存配置</button>';
+    body += '</div>';
+
+    body += '</form></div>';
+
+    body += '<script>';
+    body += 'var friendsData = ' + friendsJSON + ';';
+    body += 'var fontsData = ' + fontsJSON + ';';
+    body += 'function renderFriends() {';
+    body += '  var c = document.getElementById("friendsList"); c.innerHTML = "";';
+    body += '  friendsData.forEach(function(f, i) {';
+    body += '    var d = document.createElement("div"); d.style.cssText = "display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center";';
+    body += '    d.innerHTML = \'<input value="\' + (f.name||"") + \'" placeholder="名称" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" onchange="friendsData[\' + i + \'].name=this.value">\' + \'<input value="\' + (f.url||"") + \'" placeholder="链接" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" onchange="friendsData[\' + i + \'].url=this.value">\' + \'<input value="\' + (f.icon||"") + \'" placeholder="图标 URL" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" onchange="friendsData[\' + i + \'].icon=this.value">\' + \'<input value="\' + (f.desc||"") + \'" placeholder="描述" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" onchange="friendsData[\' + i + \'].desc=this.value">\' + \'<button type="button" class="btn btn-danger btn-sm" onclick="friendsData.splice(\' + i + \',1);renderFriends()">×</button>\';';
+    body += '    c.appendChild(d);';
+    body += '  });';
+    body += '}';
+    body += 'function addFriend() { friendsData.push({name:"",url:"",icon:"",desc:""}); renderFriends(); }';
+    body += '';
+    body += 'function renderFonts() {';
+    body += '  var c = document.getElementById("fontsList"); c.innerHTML = "";';
+    body += '  fontsData.forEach(function(f, i) {';
+    body += '    var d = document.createElement("div"); d.style.cssText = "display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center";';
+    body += '    d.innerHTML = \'<input value="\' + (f.name||"") + \'" placeholder="字体名称" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" onchange="fontsData[\' + i + \'].name=this.value">\' + \'<input value="\' + (f.url||"") + \'" placeholder="字体 URL (.woff2/.ttf)" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" onchange="fontsData[\' + i + \'].url=this.value">\' + \'<button type="button" class="btn btn-danger btn-sm" onclick="fontsData.splice(\' + i + \',1);renderFonts()">×</button>\';';
+    body += '    c.appendChild(d);';
+    body += '  });';
+    body += '}';
+    body += 'function addFont() { fontsData.push({name:"",url:""}); renderFonts(); }';
+    body += '';
+    body += 'renderFriends();';
+    body += 'renderFonts();';
+    body += '';
+    body += 'document.getElementById("siteConfigForm").addEventListener("submit", function(e) {';
+    body += '  e.preventDefault();';
+    body += '  var btn = document.getElementById("saveBtn"); btn.textContent = "保存中..."; btn.disabled = true;';
+    body += '  var data = {';
+    body += '    wallpaper: document.getElementById("wallpaper").value,';
+    body += '    video: document.getElementById("video").value,';
+    body += '    bgmSong: document.getElementById("bgmSong").value,';
+    body += '    bgmId: document.getElementById("bgmId").value,';
+    body += '    announcement: document.getElementById("announcement").value,';
+    body += '    friends: friendsData,';
+    body += '    about: document.getElementById("about").value,';
+    body += '    fonts: fontsData';
+    body += '  };';
+    body += '  fetch("/api/site-config", {';
+    body += '    method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data)';
+    body += '  }).then(function(r){return r.json()}).then(function(j){';
+    body += '    if(j.ok){showToast("配置已保存","success")} else {showToast(j.error||"保存失败","error")}';
+    body += '    btn.textContent = "💾 保存配置"; btn.disabled = false;';
+    body += '  }).catch(function(){showToast("网络错误","error"); btn.textContent = "💾 保存配置"; btn.disabled = false;});';
+    body += '});';
+    body += '</script>';
+
+    res.send(wrapHTML("站点配置", body));
+  } catch(e) {
+    res.status(500).send(wrapHTML("错误", '<div class="container"><h1>错误</h1><pre>' + esc(e.message) + '</pre></div>'));
+  }
+});
+
+// ── 站点配置 API ──
+app.post("/api/site-config", rateLimit(30, 60000), function(req, res) {
+  try {
+    var data = req.body;
+    writeSiteConfigFromObj(data);
+    res.json({ ok: true, message: "配置已保存" });
+  } catch(e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// ── 公告 API ──
+app.get("/api/announcement", rateLimit(60, 60000), function(req, res) {
+  try {
+    var cfg = parseSiteConfig(readSiteConfig());
+    res.json({ ok: true, announcement: cfg.announcement });
+  } catch(e) {
+    res.json({ ok: false, error: e.message, announcement: "" });
+  }
+});
+
+// ── 友链 API ──
+app.get("/api/friends", rateLimit(60, 60000), function(req, res) {
+  try {
+    var cfg = parseSiteConfig(readSiteConfig());
+    res.json({ ok: true, friends: cfg.friends });
+  } catch(e) {
+    res.json({ ok: false, error: e.message, friends: [] });
+  }
+});
+
+// ── 字体 API ──
+app.get("/api/fonts", rateLimit(60, 60000), function(req, res) {
+  try {
+    var cfg = parseSiteConfig(readSiteConfig());
+    res.json({ ok: true, fonts: cfg.fonts });
+  } catch(e) {
+    res.json({ ok: false, error: e.message, fonts: [] });
+  }
+});
+
+
 // ── 启动 ──
 async function start() {
   try {
@@ -1637,6 +2238,295 @@ async function start() {
   }
 
   syncImagesToPublic();
+
+// ── 封面壁纸管理页 ──
+app.get("/config/wallpaper", rateLimit(30, 60000), function(req, res) {
+  var cfg = loadSiteConfig();
+  var desktopFiles = scanFiles(WALLPAPER_DIR, [".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"]);
+  var mobileFiles = scanFiles(MOBILE_WALLPAPER_DIR, [".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"]);
+  var publicDesktop = scanFiles(path.join(PUBLIC_IMAGES_DIR, "DesktopWallpaper"), [".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"]);
+  var publicMobile = scanFiles(path.join(PUBLIC_IMAGES_DIR, "MobileWallpaper"), [".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"]);
+
+  function renderWallpaperCards(files, type, publicFiles) {
+    var allFiles = files.concat(publicFiles);
+    if (allFiles.length === 0) return '<div class="empty-state" style="padding:30px"><p>暂无壁纸文件</p></div>';
+    var paths = type === "mobile" ? cfg.wallpapers.mobile : cfg.wallpapers.desktop;
+    return '<div class="card-grid">' + allFiles.map(function(f) {
+      var relPath = "/assets/images/" + (type === "mobile" ? "MobileWallpaper/" : "CustomWallpaper/") + f.name;
+      var isUsed = paths.indexOf(relPath) !== -1;
+      var publicPath = "/assets/images/" + (type === "mobile" ? "MobileWallpaper/" : "DesktopWallpaper/") + f.name;
+      var isUsedPublic = paths.indexOf(publicPath) !== -1;
+      var used = isUsed || isUsedPublic;
+      var badge = used ? '<span class="badge badge-success" style="position:absolute;top:8px;left:8px;z-index:1;font-size:11px;padding:2px 6px;border-radius:4px;background:#16a34a;color:#fff">使用中</span>' : '';
+      var imgPath = f.name.startsWith("/") ? f.name : relPath;
+      return '<div class="card-item">' + badge +
+        '<img src="' + imgPath + '" loading="lazy" style="width:100%;aspect-ratio:16/10;object-fit:cover;display:block;background:#f1f5f9" onerror="this.style.display=\'none\'">' +
+        '<div class="card-body"><span class="card-name" title="' + f.name + '">' + f.name + '</span>' +
+        '<div style="display:flex;gap:4px">' +
+        '<button class="btn btn-danger btn-sm" onclick="deleteWallpaper(\'' + imgPath + '\')" title="删除">✕</button></div></div></div>';
+    }).join("") + '</div>';
+  }
+
+  var body = sidebar("/config/wallpaper");
+  body += '<div class="main-content">';
+  body += '<div class="page-header"><h1>' + icImage + ' 封面壁纸</h1>';
+  body += '<div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="publishConfig()">推送更新</button></div></div>';
+
+  body += '<div class="form-section"><h3>上传新壁纸</h3>';
+  body += '<div class="upload-zone" id="wallpaperUploadZone" onclick="document.getElementById(\'wallpaperFileInput\').click()">';
+  body += '<input type="file" id="wallpaperFileInput" accept="image/*" style="display:none" multiple>';
+  body += '<p style="margin:0">📁 点击或拖拽壁纸文件到此处上传</p>';
+  body += '<p style="margin:4px 0 0;font-size:12px">支持 JPG, PNG, GIF, WebP, AVIF 格式</p></div></div>';
+
+  body += '<div class="form-section"><h3>桌面壁纸 (' + (cfg.wallpapers.desktop.length) + ' 个)</h3>';
+  body += renderWallpaperCards(desktopFiles, "desktop", publicDesktop);
+  body += '</div>';
+
+  body += '<div class="form-section"><h3>移动端壁纸 (' + (cfg.wallpapers.mobile.length) + ' 个)</h3>';
+  body += renderWallpaperCards(mobileFiles, "mobile", publicMobile);
+  body += '</div></div>';
+
+  body += '<script>';
+  body += 'function uploadWallpaper(file,type){var fd=new FormData();fd.append("file",file);fd.append("type",type||"desktop");showToast("上传中...","info",10000);fetch("/api/config/wallpaper/upload",{method:"POST",body:fd}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ 上传成功","success");setTimeout(function(){location.reload()},800)}else{showToast("❌ "+(j.error||"上传失败"),"error")}}).catch(function(){showToast("❌ 网络错误","error")})}';
+  body += 'var wz=document.getElementById("wallpaperUploadZone"),wi=document.getElementById("wallpaperFileInput");';
+  body += 'wz.addEventListener("dragover",function(e){e.preventDefault();wz.classList.add("dragover")});';
+  body += 'wz.addEventListener("dragleave",function(){wz.classList.remove("dragover")});';
+  body += 'wz.addEventListener("drop",function(e){e.preventDefault();wz.classList.remove("dragover");for(var i=0;i<e.dataTransfer.files.length;i++)uploadWallpaper(e.dataTransfer.files[i])});';
+  body += 'wi.addEventListener("change",function(){for(var i=0;i<wi.files.length;i++)uploadWallpaper(wi.files[i]);wi.value=""});';
+  body += 'function deleteWallpaper(p){if(!confirm("确定删除 ？"))return;fetch("/api/config/wallpaper/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({path:p})}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ 已删除","success");setTimeout(function(){location.reload()},800)}else{showToast("❌ "+(j.error||"删除失败"),"error")}})}';
+  body += 'function publishConfig(){fetch("/api/config/publish",{method:"POST"}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ "+j.message,"success")}else{showToast("❌ "+(j.error||"推送失败"),"error")}})}';
+  body += '</script>';
+  res.send(wrapHTML("封面壁纸", body));
+});
+
+// ── 背景视频管理页 ──
+app.get("/config/video", rateLimit(30, 60000), function(req, res) {
+  var cfg = loadSiteConfig();
+  var files = scanFiles(VIDEO_DIR, [".mp4", ".webm", ".ogg", ".mov"]);
+
+  function renderCards() {
+    if (files.length === 0) return '<div class="empty-state" style="padding:30px"><p>暂无视频文件</p></div>';
+    return '<div class="card-grid">' + files.map(function(f) {
+      var isActive = cfg.video && cfg.video.indexOf(f.name) !== -1;
+      var badge = isActive ? '<span class="badge badge-info" style="position:absolute;top:8px;left:8px;z-index:1;font-size:11px;padding:2px 6px;border-radius:4px;background:#2563eb;color:#fff">当前使用</span>' : '';
+      return '<div class="card-item">' + badge +
+        '<video src="/assets/videos/' + f.name + '" muted preload="metadata" style="width:100%;aspect-ratio:16/10;object-fit:cover;display:block;background:#000" onmouseenter="this.play()" onmouseleave="this.pause();this.currentTime=0"></video>' +
+        '<div class="card-body"><span class="card-name" title="' + f.name + '">' + f.name + '</span>' +
+        '<div style="display:flex;gap:4px">' +
+        (isActive ? '' : '<button class="btn btn-primary btn-sm" onclick="selectVideo(\'' + f.name + '\')">选用</button>') +
+        '<button class="btn btn-danger btn-sm" onclick="deleteVideo(\'' + f.name + '\')" title="删除">✕</button></div></div></div>';
+    }).join("") + '</div>';
+  }
+
+  var body = sidebar("/config/video");
+  body += '<div class="main-content">';
+  body += '<div class="page-header"><h1>' + icVideo + ' 背景视频</h1>';
+  body += '<div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="publishConfig()">推送更新</button></div></div>';
+
+  body += '<div class="form-section"><h3>🎬 视频文件 (' + files.length + ' 个)</h3>';
+  body += '<div class="upload-zone" id="videoUploadZone" onclick="document.getElementById(\'videoFileInput\').click()">';
+  body += '<input type="file" id="videoFileInput" accept="video/*" style="display:none">';
+  body += '<p style="margin:0">📁 点击或拖拽视频文件到此处上传</p>';
+  body += '<p style="margin:4px 0 0;font-size:12px">支持 MP4, WebM, OGG, MOV 格式</p></div>';
+
+  if (cfg.video) {
+    body += '<div style="margin:16px 0;padding:12px;background:#f8fafc;border-radius:8px;display:flex;align-items:center;gap:12px">';
+    body += '<span style="font-size:13px;color:#64748b">当前视频:</span>';
+    body += '<code style="font-size:12px;background:#e2e8f0;padding:2px 8px;border-radius:4px">' + cfg.video + '</code>';
+    body += '</div>';
+  }
+
+  body += renderCards();
+  body += '</div></div>';
+
+  body += '<script>';
+  body += 'function uploadVideo(file){var fd=new FormData();fd.append("file",file);showToast("上传中...","info",10000);fetch("/api/config/video/upload",{method:"POST",body:fd}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ 上传成功: "+j.filename,"success");setTimeout(function(){location.reload()},800)}else{showToast("❌ "+(j.error||"上传失败"),"error")}}).catch(function(){showToast("❌ 网络错误","error")})}';
+  body += 'var vz=document.getElementById("videoUploadZone"),vi=document.getElementById("videoFileInput");';
+  body += 'vz.addEventListener("dragover",function(e){e.preventDefault();vz.classList.add("dragover")});';
+  body += 'vz.addEventListener("dragleave",function(){vz.classList.remove("dragover")});';
+  body += 'vz.addEventListener("drop",function(e){e.preventDefault();vz.classList.remove("dragover");uploadVideo(e.dataTransfer.files[0])});';
+  body += 'vi.addEventListener("change",function(){if(vi.files.length)uploadVideo(vi.files[0]);vi.value=""});';
+  body += 'function selectVideo(name){fetch("/api/config/video/select",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:name})}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ 已选用","success");setTimeout(function(){location.reload()},800)}else{showToast("❌ "+(j.error||"操作失败"),"error")}})}';
+  body += 'function deleteVideo(name){if(!confirm("确定删除 "+name+" ？"))return;fetch("/api/config/video/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:name})}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ 已删除","success");setTimeout(function(){location.reload()},800)}else{showToast("❌ "+(j.error||"删除失败"),"error")}})}';
+  body += 'function publishConfig(){fetch("/api/config/publish",{method:"POST"}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ "+j.message,"success")}else{showToast("❌ "+(j.error||"推送失败"),"error")}})}';
+  body += '</script>';
+  res.send(wrapHTML("背景视频", body));
+});
+
+// ── 背景音乐管理页 ──
+app.get("/config/music", rateLimit(30, 60000), function(req, res) {
+  var cfg = loadSiteConfig();
+  var files = scanFiles(MUSIC_DIR, [".mp3", ".ogg", ".wav", ".flac", ".aac", ".m4a"]);
+
+  function renderMusicList() {
+    if (cfg.music.length === 0) return '<div class="empty-state" style="padding:30px"><p>暂无音乐</p></div>';
+    return '<div style="display:flex;flex-direction:column;gap:8px">' + cfg.music.map(function(m, i) {
+      return '<div style="display:flex;align-items:center;gap:12px;padding:12px;background:#f8fafc;border-radius:8px">' +
+        '<span style="font-size:24px;width:36px;text-align:center">🎵</span>' +
+        '<div style="flex:1;min-width:0">' +
+        '<div style="font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (m.name || '未命名') + '</div>' +
+        '<div style="font-size:12px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (m.artist || '未知歌手') + ' · ' + (m.url || '') + '</div>' +
+        '</div>' +
+        '<button class="btn btn-danger btn-sm" onclick="removeMusic(' + i + ')">删除</button>' +
+        '</div>';
+    }).join("") + '</div>';
+  }
+
+  var body = sidebar("/config/music");
+  body += '<div class="main-content">';
+  body += '<div class="page-header"><h1>' + icMusic + ' 背景音乐</h1>';
+  body += '<div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="publishConfig()">推送更新</button></div></div>';
+
+  body += '<div class="form-section"><h3>上传音乐文件</h3>';
+  body += '<div class="upload-zone" id="musicUploadZone" onclick="document.getElementById(\'musicFileInput\').click()">';
+  body += '<input type="file" id="musicFileInput" accept="audio/*" style="display:none">';
+  body += '<p style="margin:0">📁 点击或拖拽音频文件到此处上传</p>';
+  body += '<p style="margin:4px 0 0;font-size:12px">支持 MP3, OGG, WAV, FLAC, AAC, M4A 格式</p></div></div>';
+
+  body += '<div class="form-section"><h3>本地音乐文件 (' + files.length + ' 个)</h3>';
+  if (files.length > 0) {
+    body += '<div style="display:flex;flex-direction:column;gap:6px">' + files.map(function(f) {
+      var isInPlaylist = cfg.music.some(function(m) { return m.url && m.url.indexOf(f.name) !== -1; });
+      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#f8fafc;border-radius:6px">' +
+        '<span style="font-size:14px">🎵</span>' +
+        '<span style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + f.name + '</span>' +
+        '<span style="font-size:12px;color:#94a3b8">' + f.size + '</span>' +
+        (isInPlaylist ? '<span style="font-size:11px;color:#16a34a">已添加</span>' : '<button class="btn btn-primary btn-sm" onclick="addMusic(\'' + f.name + '\')">添加</button>') +
+        '<button class="btn btn-danger btn-sm" onclick="deleteMusicFile(\'' + f.name + '\')">删除</button>' +
+        '</div>';
+    }).join("") + '</div>';
+  } else {
+    body += '<p style="color:#94a3b8;font-size:13px">暂无本地音乐文件</p>';
+  }
+  body += '</div>';
+
+  body += '<div class="form-section"><h3>播放列表 (' + cfg.music.length + ' 首)</h3>';
+  body += '<div id="musicList">' + renderMusicList() + '</div>';
+  body += '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">';
+  body += '<input id="musicName" placeholder="歌曲名" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;width:120px">';
+  body += '<input id="musicArtist" placeholder="歌手" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;width:100px">';
+  body += '<input id="musicUrl" placeholder="URL (如 /assets/music/xxx.mp3)" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;flex:1;min-width:200px">';
+  body += '<button class="btn btn-success btn-sm" onclick="addMusicManual()">手动添加</button>';
+  body += '</div></div></div>';
+
+  body += '<script>';
+  body += 'var musicData=' + JSON.stringify(cfg.music) + ';';
+  body += 'function uploadMusic(file){var fd=new FormData();fd.append("file",file);showToast("上传中...","info",10000);fetch("/api/config/music/upload",{method:"POST",body:fd}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ 上传成功","success");setTimeout(function(){location.reload()},800)}else{showToast("❌ "+(j.error||"上传失败"),"error")}}).catch(function(){showToast("❌ 网络错误","error")})}';
+  body += 'var mz=document.getElementById("musicUploadZone"),mi=document.getElementById("musicFileInput");';
+  body += 'mz.addEventListener("dragover",function(e){e.preventDefault();mz.classList.add("dragover")});';
+  body += 'mz.addEventListener("dragleave",function(){mz.classList.remove("dragover")});';
+  body += 'mz.addEventListener("drop",function(e){e.preventDefault();mz.classList.remove("dragover");uploadMusic(e.dataTransfer.files[0])});';
+  body += 'mi.addEventListener("change",function(){if(mi.files.length)uploadMusic(mi.files[0]);mi.value=""});';
+  body += 'function addMusic(name){musicData.push({name:name.replace(/\.[^.]+$/,""),artist:"",url:"/assets/music/"+name,cover:"",lrc:""});saveMusicList()}';
+  body += 'function addMusicManual(){var n=document.getElementById("musicName").value,a=document.getElementById("musicArtist").value,u=document.getElementById("musicUrl").value;if(!u){showToast("请填写URL","error");return}musicData.push({name:n,artist:a,url:u,cover:"",lrc:""});saveMusicList()}';
+  body += 'function removeMusic(i){musicData.splice(i,1);saveMusicList()}';
+  body += 'function saveMusicList(){fetch("/api/config/music/update",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({music:musicData})}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ 已保存","success");setTimeout(function(){location.reload()},800)}else{showToast("❌ "+(j.error||"保存失败"),"error")}})}';
+  body += 'function deleteMusicFile(name){if(!confirm("确定删除 "+name+" ？"))return;fetch("/api/config/music/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:name})}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ 已删除","success");setTimeout(function(){location.reload()},800)}else{showToast("❌ "+(j.error||"删除失败"),"error")}})}';
+  body += 'function publishConfig(){fetch("/api/config/publish",{method:"POST"}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ "+j.message,"success")}else{showToast("❌ "+(j.error||"推送失败"),"error")}})}';
+  body += '</script>';
+  res.send(wrapHTML("背景音乐", body));
+});
+
+// ── 公告管理页 ──
+app.get("/config/announcement", rateLimit(30, 60000), function(req, res) {
+  var cfg = loadSiteConfig();
+  var a = cfg.announcement || { title: "", content: "", closable: true, link: { enable: false, text: "", url: "", external: false } };
+
+  var body = sidebar("/config/announcement");
+  body += '<div class="main-content">';
+  body += '<div class="page-header"><h1>' + icAnnounce + ' 公告管理</h1>';
+  body += '<div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="publishConfig()">推送更新</button></div></div>';
+
+  body += '<div class="form-section">';
+  body += '<div class="form-grid">';
+  body += '<div class="form-group full"><label>公告标题</label><input id="annTitle" value="' + (a.title || '').replace(/"/g, '&quot;') + '" placeholder="输入公告标题"></div>';
+  body += '<div class="form-group full"><label>公告内容</label><textarea id="annContent" rows="4" style="min-height:100px;resize:vertical;font-family:inherit">' + (a.content || '') + '</textarea></div>';
+  body += '<div class="form-group"><label><input type="checkbox" id="annClosable" ' + (a.closable !== false ? 'checked' : '') + '> 可关闭</label></div>';
+  body += '<div class="form-group"><label><input type="checkbox" id="annLinkEnable" ' + (a.link && a.link.enable ? 'checked' : '') + '> 包含链接</label></div>';
+  body += '<div class="form-group full" id="linkFields" style="' + (a.link && a.link.enable ? '' : 'display:none') + '">';
+  body += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+  body += '<input id="annLinkText" value="' + ((a.link && a.link.text) || '').replace(/"/g, '&quot;') + '" placeholder="链接文字" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;width:150px">';
+  body += '<input id="annLinkUrl" value="' + ((a.link && a.link.url) || '').replace(/"/g, '&quot;') + '" placeholder="链接URL" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;flex:1">';
+  body += '<label style="font-size:13px;display:flex;align-items:center;gap:4px"><input type="checkbox" id="annLinkExternal" ' + (a.link && a.link.external ? 'checked' : '') + '> 新窗口</label>';
+  body += '</div></div>';
+  body += '</div></div>';
+
+  body += '<div class="form-actions"><button class="btn btn-success" onclick="saveAnnouncement()">保存</button></div>';
+  body += '</div>';
+
+  body += '<script>';
+  body += 'document.getElementById("annLinkEnable").addEventListener("change",function(){document.getElementById("linkFields").style.display=this.checked?"":"none"});';
+  body += 'function saveAnnouncement(){var a={title:document.getElementById("annTitle").value,content:document.getElementById("annContent").value,closable:document.getElementById("annClosable").checked,link:{enable:document.getElementById("annLinkEnable").checked,text:document.getElementById("annLinkText").value,url:document.getElementById("annLinkUrl").value,external:document.getElementById("annLinkExternal").checked}};fetch("/api/config/announcement",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({announcement:a})}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ 已保存","success")}else{showToast("❌ "+(j.error||"保存失败"),"error")}})}';
+  body += 'function publishConfig(){saveAnnouncement();fetch("/api/config/publish",{method:"POST"}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ "+j.message,"success")}else{showToast("❌ "+(j.error||"推送失败"),"error")}})}';
+  body += '</script>';
+  res.send(wrapHTML("公告管理", body));
+});
+
+// ── 关于我管理页 ──
+app.get("/config/about", rateLimit(30, 60000), function(req, res) {
+  var cfg = loadSiteConfig();
+
+  var body = sidebar("/config/about");
+  body += '<div class="main-content">';
+  body += '<div class="page-header"><h1>' + icUser + ' 关于我</h1>';
+  body += '<div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="publishConfig()">推送更新</button></div></div>';
+
+  body += '<div class="form-section">';
+  body += '<div class="form-group"><label>个人介绍 (Markdown)</label>';
+  body += '<textarea id="aboutContent" rows="15" style="min-height:300px;resize:vertical;font-family:inherit">' + (cfg.about || '') + '</textarea></div>';
+  body += '</div>';
+
+  body += '<div class="form-actions"><button class="btn btn-success" onclick="saveAbout()">保存</button></div>';
+  body += '</div>';
+
+  body += '<script>';
+  body += 'function saveAbout(){fetch("/api/config/about",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({about:document.getElementById("aboutContent").value})}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ 已保存","success")}else{showToast("❌ "+(j.error||"保存失败"),"error")}})}';
+  body += 'function publishConfig(){saveAbout();fetch("/api/config/publish",{method:"POST"}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ "+j.message,"success")}else{showToast("❌ "+(j.error||"推送失败"),"error")}})}';
+  body += '</script>';
+  res.send(wrapHTML("关于我", body));
+});
+
+// ── 自定义字体管理页 ──
+app.get("/config/font", rateLimit(30, 60000), function(req, res) {
+  var cfg = loadSiteConfig();
+  var fonts = cfg.fonts || [];
+
+  var body = sidebar("/config/font");
+  body += '<div class="main-content">';
+  body += '<div class="page-header"><h1>' + icFont + ' 自定义字体</h1>';
+  body += '<div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="publishConfig()">推送更新</button></div></div>';
+
+  body += '<div class="form-section">';
+  body += '<div id="fontList">';
+  if (fonts.length > 0) {
+    body += '<div style="display:flex;flex-direction:column;gap:8px">' + fonts.map(function(f, i) {
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f8fafc;border-radius:8px">' +
+        '<input value="' + (f.name || '').replace(/"/g, '&quot;') + '" placeholder="字体名" onchange="fonts[' + i + '].name=this.value" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;width:120px">' +
+        '<input value="' + (f.url || '').replace(/"/g, '&quot;') + '" placeholder="字体URL" onchange="fonts[' + i + '].url=this.value" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;flex:1">' +
+        '<button class="btn btn-danger btn-sm" onclick="removeFont(' + i + ')">删除</button>' +
+        '</div>';
+    }).join("") + '</div>';
+  } else {
+    body += '<p style="color:#94a3b8;font-size:13px">暂无自定义字体</p>';
+  }
+  body += '</div>';
+  body += '<div style="margin-top:12px;display:flex;gap:8px">';
+  body += '<button class="btn btn-ghost btn-sm" onclick="addFont()">+ 添加字体</button>';
+  body += '</div></div>';
+
+  body += '<div class="form-actions"><button class="btn btn-success" onclick="saveFonts()">保存</button></div>';
+  body += '</div>';
+
+  body += '<script>';
+  body += 'var fonts=' + JSON.stringify(fonts) + ';';
+  body += 'function addFont(){fonts.push({name:"",url:""});renderFonts()}';
+  body += 'function removeFont(i){fonts.splice(i,1);renderFonts()}';
+  body += 'function renderFonts(){location.reload()}';
+  body += 'function saveFonts(){fetch("/api/config/fonts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({fonts:fonts})}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ 已保存","success")}else{showToast("❌ "+(j.error||"保存失败"),"error")}})}';
+  body += 'function publishConfig(){saveFonts();fetch("/api/config/publish",{method:"POST"}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ "+j.message,"success")}else{showToast("❌ "+(j.error||"推送失败"),"error")}})}';
+  body += '</script>';
+  res.send(wrapHTML("自定义字体", body));
+});
 
   var PORT = process.env.PORT || 3000;
   app.listen(PORT, function() {
