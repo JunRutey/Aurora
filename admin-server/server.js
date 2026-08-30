@@ -930,6 +930,9 @@ app.get("/api/thumb/*", rateLimit(120, 60000), function(req, res) {
     if (!fs.existsSync(filePath)) {
       return res.status(404).send("Not found");
     }
+    // 设置缓存头，浏览器缓存 7 天
+    res.setHeader("Cache-Control", "public, max-age=604800, immutable");
+    res.setHeader("ETag", "\"" + fs.statSync(filePath).size + "-" + fs.statSync(filePath).mtimeMs + "\"");
     res.sendFile(filePath);
   } catch (e) {
     res.status(500).send("Internal server error");
@@ -2773,20 +2776,26 @@ app.get("/config/wallpaper", rateLimit(30, 60000), function(req, res) {
     var allFiles = files.concat(publicFiles);
     if (allFiles.length === 0) return '<div class="empty-state" style="padding:30px"><p>暂无壁纸文件</p></div>';
     var paths = type === "mobile" ? cfg.wallpapers.mobile : cfg.wallpapers.desktop;
-    return '<div class="card-grid">' + allFiles.map(function(f) {
+    var sid = type === "mobile" ? "mobile" : "desktop";
+    var html = '<div style="margin-bottom:10px;display:flex;align-items:center;gap:10px"><label style="font-size:13px;color:#64748b;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="selAll-' + sid + '" onchange="toggleSelectAll(\'' + sid + '\',this.checked)"> 全选</label>';
+    html += '<button class="btn btn-danger btn-sm" id="batchDel-' + sid + '" onclick="batchDelete(\'' + sid + '\')" style="display:none">批量删除</button>';
+    html += '<span id="selCount-' + sid + '" style="font-size:12px;color:#94a3b8"></span></div>';
+    html += '<div class="card-grid" id="grid-' + sid + '">';
+    html += allFiles.map(function(f) {
       var relPath = "/assets/images/" + (f._subdir || (type === "mobile" ? "MobileWallpaper" : "CustomWallpaper")) + "/" + f.name;
       var used = paths.indexOf(relPath) !== -1;
-      var badge = used ? '<span class="badge badge-success" style="position:absolute;top:8px;left:8px;z-index:1;font-size:11px;padding:2px 6px;border-radius:4px;background:#16a34a;color:#fff">使用中</span>' : '';
-      // 通过 /api/thumb/ 代理加载图片，确保浏览器可预览
+      var badge = used ? '<span style="position:absolute;top:8px;left:8px;z-index:2;font-size:11px;padding:2px 6px;border-radius:4px;background:#16a34a;color:#fff">使用中</span>' : '';
       var thumbSrc = "/api/thumb/" + f._src + "/assets/images/" + f._subdir + "/" + f.name;
-      return '<div class="card-item" style="position:relative;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;background:#f8fafc">' + badge +
-        '<div style="width:100%;aspect-ratio:16/10;overflow:hidden;background:#f1f5f9;display:flex;align-items:center;justify-content:center">' +
-        '<img src="' + thumbSrc + '" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.display=\'none\'">' +
+      return '<div class="card-item" data-path="' + relPath + '" data-section="' + sid + '" style="position:relative;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;background:#f8fafc">' + badge +
+        '<label style="position:absolute;top:8px;right:8px;z-index:3;background:rgba(255,255,255,.85);border-radius:4px;padding:2px 6px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:4px;box-shadow:0 1px 3px rgba(0,0,0,.1)"><input type="checkbox" class="wallpaper-cb" data-section="' + sid + '" data-path="' + relPath + '" onchange="onCheckChange(\'' + sid + '\')"> 选</label>' +
+        '<div style="width:100%;aspect-ratio:16/10;overflow:hidden;background:#e2e8f0;display:flex;align-items:center;justify-content:center">' +
+        '<img src="' + thumbSrc + '" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.display=\'none\'">' +
         '</div>' +
         '<div style="padding:8px 10px"><span style="font-size:12px;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block" title="' + f.name + '">' + f.name + '</span>' +
         '<div style="display:flex;gap:4px;margin-top:6px">' +
-        '<button class="btn btn-danger btn-sm" onclick="deleteWallpaper(\'' + relPath + '\')" title="删除">删除</button></div></div></div>';
+        '<button class="btn btn-danger btn-sm" onclick="deleteWallpaperSingle(this,\'' + relPath + '\')" title="删除">删除</button></div></div></div>';
     }).join("") + '</div>';
+    return html;
   }
 
   var body = '<div class="container" style="max-width:1200px;">';
@@ -2816,7 +2825,14 @@ app.get("/config/wallpaper", rateLimit(30, 60000), function(req, res) {
   body += 'wz.addEventListener("dragleave",function(){wz.classList.remove("dragover")});';
   body += 'wz.addEventListener("drop",function(e){e.preventDefault();wz.classList.remove("dragover");for(var i=0;i<e.dataTransfer.files.length;i++)uploadWallpaper(e.dataTransfer.files[i])});';
   body += 'wi.addEventListener("change",function(){for(var i=0;i<wi.files.length;i++)uploadWallpaper(wi.files[i]);wi.value=""});';
-  body += 'function deleteWallpaper(p){if(!confirm("确定删除 ？"))return;fetch("/api/config/wallpaper/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({path:p})}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ 已删除","success");setTimeout(function(){location.reload()},800)}else{showToast("❌ "+(j.error||"删除失败"),"error")}})}';
+  // 单个删除（局部刷新）
+  body += 'function deleteWallpaperSingle(btn,path){if(!confirm("确定删除该壁纸？"))return;setLoading(btn,true);fetch("/api/config/wallpaper/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({path:path})}).then(function(r){return r.json()}).then(function(j){if(j.ok){var card=btn.closest(".card-item");if(card)card.remove();showToast("✅ 已删除","success")}else{showToast("❌ "+(j.error||"删除失败"),"error");setLoading(btn,false)}}).catch(function(){showToast("❌ 网络错误","error");setLoading(btn,false)})}';
+  // 全选/取消
+  body += 'function toggleSelectAll(section,checked){document.querySelectorAll(".wallpaper-cb[data-section="+section+"]").forEach(function(cb){cb.checked=checked});onCheckChange(section)}';
+  // 勾选变化
+  body += 'function onCheckChange(section){var cbs=document.querySelectorAll(".wallpaper-cb[data-section="+section+"]");var cnt=0;cbs.forEach(function(cb){if(cb.checked)cnt++});var btn=document.getElementById("batchDel-"+section);var lbl=document.getElementById("selCount-"+section);if(cnt>0){btn.style.display="";lbl.textContent="已选 "+cnt+" 项"}else{btn.style.display="none";lbl.textContent=""};var all=document.getElementById("selAll-"+section);if(all)all.checked=cnt===cbs.length&&cbs.length>0}';
+  // 批量删除
+  body += 'function batchDelete(section){var cbs=document.querySelectorAll(".wallpaper-cb[data-section="+section+"]:checked");if(cbs.length===0){showToast("请先选择要删除的壁纸","info");return}if(!confirm("确定删除选中的 "+cbs.length+" 张壁纸？"))return;var paths=[];cbs.forEach(function(cb){paths.push(cb.dataset.path)});var btn=document.getElementById("batchDel-"+section);setLoading(btn,true);var done=0;var errors=0;paths.forEach(function(p){fetch("/api/config/wallpaper/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({path:p})}).then(function(r){return r.json()}).then(function(j){done++;if(!j.ok)errors++;if(done===paths.length){if(errors>0){showToast("删除完成，"+errors+" 项失败","error")}else{showToast("✅ 全部删除成功","success")}setTimeout(function(){location.reload()},800)}}).catch(function(){done++;errors++;if(done===paths.length){showToast("部分删除失败","error");setLoading(btn,false)}})})}';
   body += 'function publishConfig(){fetch("/api/config/publish",{method:"POST"}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ "+j.message,"success")}else{showToast("❌ "+(j.error||"推送失败"),"error")}})}';
   body += '</script>';
   body += '</div></div>';
