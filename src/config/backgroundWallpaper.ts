@@ -28,14 +28,12 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 	 *
 	 * 支持配置多张图片（数组），每次刷新页面随机显示一张：
 	 * desktop: [
-	 * "assets/images/DesktopWallpaper/d1.avif",
-	 * "assets/images/DesktopWallpaper/d2.avif",
-	 * ],
+,
+		],
 	 *
-	 * mobile:[
-	 *   "assets/images/MobileWallpaper/m1.avif",
-	 *   "assets/images/MobileWallpaper/m2.avif",
-	 * ],
+	 * mobile: [
+,
+		],
 	 */
 	src: {
 		// 桌面背景图片（支持单张或多张随机）

@@ -1,7 +1,5 @@
 {
   "src:assets/images/avatar.avif": "dcd8d5d1cecabea9a9",
-  "public:gallery/firefly-2026/cover.avif": "7588a28a8f989e8d88",
-  "public:gallery/firefly-2026/1.avif": "c8bca9dde6d2babfb5",
   "src:content/posts/images/vitepress.avif": "3d3d43e1e1e7ebe0da",
   "src:content/posts/images/right-grid2.avif": "cbcdcddddcd9d8d7db",
   "src:content/posts/images/obsidian.avif": "3a4145dce3e6e8ded8",
@@ -28,13 +26,6 @@
   "public:assets/images/sponsor/alipay.png": "8ebbde91bedf93c0e0",
   "public:assets/images/ad/ad1.webp": "a1b8b68a8e918c8f93",
   "src:assets/images/avatar.jpg": "",
-  "src:assets/images/MobileWallpaper/m7.webp": "6d718d574d64474a67",
-  "src:assets/images/MobileWallpaper/m6.webp": "deccd8c6bcccb99fb6",
-  "src:assets/images/MobileWallpaper/m5.webp": "c3aca3ac9b9ab7a4a6",
-  "src:assets/images/MobileWallpaper/m4.webp": "88a1a3dcdad2c7c0af",
-  "src:assets/images/MobileWallpaper/m3.webp": "c8bbc4b5a9b2cdb1a6",
-  "src:assets/images/MobileWallpaper/m2.webp": "c6bfbeb3a8a7a09698",
-  "src:assets/images/MobileWallpaper/m1.webp": "808274a5a89ba1a29c",
   "src:assets/images/CustomWallpaper/wp8.jpg": "5f4a3768513ebd8e66",
   "src:assets/images/CustomWallpaper/wp7.jpg": "d0d1b7d5beb2cfc1c5",
   "src:assets/images/CustomWallpaper/wp6.jpg": "8083b56f84c27e7dab",
@@ -75,5 +66,12 @@
   "public:assets/images/CustomWallpaper/wp4.jpg": "a3d0b883b1a290b598",
   "public:assets/images/CustomWallpaper/wp3.jpg": "9ca1bdcfcfd1c1c0c5",
   "public:assets/images/CustomWallpaper/wp2.jpg": "a9c7d099c2e2a7b5c4",
-  "public:assets/images/CustomWallpaper/wp1.jpg": "836c969381a8a67db4"
+  "public:assets/images/CustomWallpaper/wp1.jpg": "836c969381a8a67db4",
+  "src:assets/images/MobileWallpaper/c271d486-f66f-4a02-ba78-ca0e6c11552e.jpg": "eed4c8eedad1e8b8b6",
+  "src:assets/images/MobileWallpaper/146681548_p0.jpg": "dddbdecacad2a09da7",
+  "src:assets/images/MobileWallpaper/141955037_p0 (1).jpg": "a77d96d0a5b7d1bec8",
+  "src:assets/images/MobileWallpaper/141821567_p0 (1).jpg": "81706ac5b1a4c9ab9e",
+  "src:assets/images/MobileWallpaper/138868564_p0.jpg": "869ea2dfd9d4c9bfaf",
+  "src:assets/images/MobileWallpaper/138687752_p0.jpg": "d1bab4cda899b2736b",
+  "src:assets/images/MobileWallpaper/134477391_p0.jpg": "c4b8c3b8adb7c0a69e"
 }
