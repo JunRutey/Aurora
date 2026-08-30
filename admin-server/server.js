@@ -108,9 +108,7 @@ var musicUpload = multer({
       cb(null, MUSIC_DIR);
     },
     filename: function(req, file, cb) {
-      var ext = path.extname(file.originalname);
-      var base = path.basename(file.originalname, ext).toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff_-]/g, "-").replace(/-+/g, "-");
-      cb(null, base + "-" + Date.now() + ext);
+      cb(null, file.originalname);
     }
   }),
   limits: { fileSize: 50 * 1024 * 1024 },
@@ -2800,7 +2798,7 @@ app.get("/config/wallpaper", rateLimit(30, 60000), function(req, res) {
 
   var body = '<div class="container" style="max-width:1200px;">';
   body += '<header style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px">';
-  body += '<h1 style="margin:0;font-size:22px">封面壁纸</h1>';
+  body += '<div style="display:flex;align-items:center;gap:10px"><button onclick="history.back()" class="btn btn-ghost btn-sm" style="font-size:16px;padding:6px 10px">←</button><h1 style="margin:0;font-size:22px">封面壁纸</h1></div>';
   body += '<div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="publishConfig()">推送更新</button><a href="/" class="btn btn-ghost">返回后台</a></div>';
   body += '</header>';
 
@@ -2861,7 +2859,7 @@ app.get("/config/video", rateLimit(30, 60000), function(req, res) {
 
   var body = '<div class="container" style="max-width:1200px;">';
   body += '<header style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px">';
-  body += '<h1 style="margin:0;font-size:22px">背景视频</h1>';
+  body += '<div style="display:flex;align-items:center;gap:10px"><button onclick="history.back()" class="btn btn-ghost btn-sm" style="font-size:16px;padding:6px 10px">←</button><h1 style="margin:0;font-size:22px">背景视频</h1></div>';
   body += '<div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="publishConfig()">推送更新</button><a href="/" class="btn btn-ghost">返回后台</a></div>';
   body += '</header>';
 
@@ -2924,25 +2922,23 @@ app.get("/config/music", rateLimit(30, 60000), function(req, res) {
 
   var body = '<div class="container" style="max-width:1200px;">';
   body += '<header style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px">';
-  body += '<h1 style="margin:0;font-size:22px">背景音乐</h1>';
+  body += '<div style="display:flex;align-items:center;gap:10px"><button onclick="history.back()" class="btn btn-ghost btn-sm" style="font-size:16px;padding:6px 10px">←</button><h1 style="margin:0;font-size:22px">背景音乐</h1></div>';
   body += '<div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="publishConfig()">推送更新</button><a href="/" class="btn btn-ghost">返回后台</a></div>';
   body += '</header>';
 
   body += '<div class="form-section" style="background:#fff;border:1px solid #e8e8e8;border-radius:12px;padding:20px;box-shadow:0 12px 30px rgba(15,23,42,.04)"><h3>上传音乐文件</h3>';
   body += '<div class="upload-zone" id="musicUploadZone" onclick="document.getElementById(\'musicFileInput\').click()">';
-  body += '<input type="file" id="musicFileInput" accept="audio/*" style="display:none">';
-  body += '<p style="margin:0">📁 点击或拖拽音频文件到此处上传</p>';
-  body += '<p style="margin:4px 0 0;font-size:12px">支持 MP3, OGG, WAV, FLAC, AAC, M4A 格式</p></div></div>';
+  body += '<input type="file" id="musicFileInput" accept="audio/*,image/*" style="display:none" multiple>';
+  body += '<p style="margin:0">📁 点击或拖拽文件到此处上传</p>';
+  body += '<p style="margin:4px 0 0;font-size:12px">可同时选择音频 + 封面图片，音频会自动添加到播放列表并关联封面</p></div></div>';
 
   body += '<div class="form-section"><h3>本地音乐文件 (' + files.length + ' 个)</h3>';
   if (files.length > 0) {
     body += '<div style="display:flex;flex-direction:column;gap:6px">' + files.map(function(f) {
-      var isInPlaylist = cfg.music.some(function(m) { return m.url && m.url.indexOf(f.name) !== -1; });
       return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#f8fafc;border-radius:6px">' +
         '<span style="font-size:14px">🎵</span>' +
         '<span style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + f.name + '</span>' +
         '<span style="font-size:12px;color:#94a3b8">' + f.size + '</span>' +
-        (isInPlaylist ? '<span style="font-size:11px;color:#16a34a">已添加</span>' : '<button class="btn btn-primary btn-sm" onclick="addMusic(\'' + f.name + '\')">添加</button>') +
         '<button class="btn btn-danger btn-sm" onclick="deleteMusicFile(\'' + f.name + '\')">删除</button>' +
         '</div>';
     }).join("") + '</div>';
@@ -2953,26 +2949,14 @@ app.get("/config/music", rateLimit(30, 60000), function(req, res) {
 
   body += '<div class="form-section"><h3>播放列表 (' + cfg.music.length + ' 首)</h3>';
   body += '<div id="musicList">' + renderMusicList() + '</div>';
-  body += '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">';
-  body += '<input id="musicName" placeholder="歌曲名" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;width:120px">';
-  body += '<input id="musicArtist" placeholder="歌手" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;width:100px">';
-  body += '<input id="musicUrl" placeholder="URL (如 /assets/music/xxx.mp3)" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;flex:1;min-width:180px">';
-  body += '<input id="musicCover" placeholder="封面 URL" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;width:180px">';
-  body += '<button class="btn btn-success btn-sm" onclick="addMusicManual()">手动添加</button>';
-  body += '</div></div></div>';
-
   body += '<script>';
   body += 'var musicData=' + JSON.stringify(cfg.music) + ';';
-  body += 'function uploadMusic(file){var fd=new FormData();fd.append("file",file);showToast("上传中...","info",10000);fetch("/api/config/music/upload",{method:"POST",body:fd}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ 上传成功","success");setTimeout(function(){location.reload()},800)}else{showToast("❌ "+(j.error||"上传失败"),"error")}}).catch(function(){showToast("❌ 网络错误","error")})}';
-  body += 'function uploadMusicCover(index,file){if(!file)return;var fd=new FormData();fd.append("file",file);showToast("上传封面中...","info",10000);fetch("/api/config/music/cover-upload",{method:"POST",body:fd}).then(function(r){return r.json()}).then(function(j){if(j.ok){musicData[index].cover=j.path;saveMusicList();showToast("✅ 封面已更新","success")}else{showToast("❌ "+(j.error||"封面上传失败"),"error")}}).catch(function(){showToast("❌ 网络错误","error")})}';
-  body += 'function handleMusicCoverUpload(index,file){uploadMusicCover(index,file);var input=document.getElementById("music-cover-input-"+index);if(input) input.value=""; }';
+  body += 'function uploadMusicFiles(files){var audioFiles=[],imageFiles=[];for(var i=0;i<files.length;i++){var f=files[i];if(/^image\\//.test(f.type))imageFiles.push(f);else audioFiles.push(f)}if(audioFiles.length===0){showToast("请至少选择一个音频文件","error");return}showToast("上传中...","info",30000);var idx=0;function uploadNext(){if(idx>=audioFiles.length){showToast("\\u2705 全部上传成功","success");setTimeout(function(){location.reload()},800);return}var af=audioFiles[idx];var fd=new FormData();fd.append("file",af);fetch("/api/config/music/upload",{method:"POST",body:fd}).then(function(r){return r.json()}).then(function(j){if(j.ok){if(imageFiles.length>0){var cf=imageFiles.shift();var cfd=new FormData();cfd.append("file",cf);fetch("/api/config/music/cover-upload",{method:"POST",body:cfd}).then(function(){idx++;uploadNext()}).catch(function(){idx++;uploadNext()})}else{idx++;uploadNext()}}else{showToast("\\u274c "+af.name+" 上传失败","error");idx++;uploadNext()}}).catch(function(){idx++;uploadNext()})}uploadNext()}';
   body += 'var mz=document.getElementById("musicUploadZone"),mi=document.getElementById("musicFileInput");';
   body += 'mz.addEventListener("dragover",function(e){e.preventDefault();mz.classList.add("dragover")});';
   body += 'mz.addEventListener("dragleave",function(){mz.classList.remove("dragover")});';
-  body += 'mz.addEventListener("drop",function(e){e.preventDefault();mz.classList.remove("dragover");uploadMusic(e.dataTransfer.files[0])});';
-  body += 'mi.addEventListener("change",function(){if(mi.files.length)uploadMusic(mi.files[0]);mi.value=""});';
-  body += 'function addMusic(name){musicData.push({name:name.replace(/\.[^.]+$/,""),artist:"",url:"/assets/music/"+name,cover:"",lrc:""});saveMusicList()}';
-  body += 'function addMusicManual(){var n=document.getElementById("musicName").value,a=document.getElementById("musicArtist").value,u=document.getElementById("musicUrl").value,c=document.getElementById("musicCover").value;if(!u){showToast("请填写URL","error");return}musicData.push({name:n||"未命名",artist:a||"未知歌手",url:u,cover:c||"",lrc:""});saveMusicList()}';
+  body += 'mz.addEventListener("drop",function(e){e.preventDefault();mz.classList.remove("dragover");uploadMusicFiles(e.dataTransfer.files)});';
+  body += 'mi.addEventListener("change",function(){if(mi.files.length)uploadMusicFiles(mi.files);mi.value=""});';
   body += 'function removeMusic(i){musicData.splice(i,1);saveMusicList()}';
   body += 'function saveMusicList(){fetch("/api/config/music/update",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({music:musicData})}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ 已保存","success");setTimeout(function(){location.reload()},800)}else{showToast("❌ "+(j.error||"保存失败"),"error")}})}';
   body += 'function deleteMusicFile(name){if(!confirm("确定删除 "+name+" ？"))return;fetch("/api/config/music/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:name})}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("✅ 已删除","success");setTimeout(function(){location.reload()},800)}else{showToast("❌ "+(j.error||"删除失败"),"error")}})}';
