@@ -1227,8 +1227,24 @@ app.get("/", function(req, res) {
 
     var dynamicEntries = [];
     try {
-      var dynamicJson = fs.readFileSync(path.join(PROJECT_ROOT, "src", "content", "dynamic", "index.json"), "utf-8");
-      dynamicEntries = JSON.parse(dynamicJson);
+      var dynamicDir = path.join(PROJECT_ROOT, "src", "content", "dynamic");
+      if (fs.existsSync(dynamicDir)) {
+        var dFiles = fs.readdirSync(dynamicDir).filter(function(f) { return /\.(md|mdx)$/i.test(f); });
+        dFiles.forEach(function(f) {
+          try {
+            var raw = fs.readFileSync(path.join(dynamicDir, f), "utf-8");
+            var parsed = matter(raw);
+            dynamicEntries.push({
+              slug: f.replace(/\.(md|mdx)$/i, ""),
+              title: f.replace(/\.(md|mdx)$/i, ""),
+              date: parsed.data.published || "",
+              pinned: parsed.data.pinned || false,
+              location: parsed.data.location || ""
+            });
+          } catch (inner) { /* skip unreadable files */ }
+        });
+        dynamicEntries.sort(function(a, b) { return (b.date ? new Date(b.date) : 0) - (a.date ? new Date(a.date) : 0); });
+      }
     } catch (e) {
       dynamicEntries = [];
     }
