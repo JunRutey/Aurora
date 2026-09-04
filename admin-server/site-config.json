@@ -4,7 +4,15 @@
     "mobile": []
   },
   "video": "",
-  "music": [],
+  "music": [
+    {
+      "name": "还是分开",
+      "artist": "张叶蕾",
+      "url": "/assets/music/还是分开.mp3",
+      "cover": "/assets/music/cover/14ce36d3d539b60041f5ebe0e650352ac65cb7aa-1788522734341.jpg",
+      "lrc": ""
+    }
+  ],
   "announcement": {
     "title": "",
     "content": "",
