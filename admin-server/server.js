@@ -2801,7 +2801,7 @@ async function start() {
 // ── 友链管理页（默认进入的二级页面） ──
 app.get("/config/friends", rateLimit(30, 60000), function(req, res) {
   try {
-    var cfg = parseSiteConfig(readSiteConfig());
+    var cfg = loadSiteConfig();
     var friends = Array.isArray(cfg.friends) ? cfg.friends : [];
 
     var body = '<div class="container" style="max-width:1200px;">';
@@ -2831,7 +2831,7 @@ app.get("/config/friends", rateLimit(30, 60000), function(req, res) {
 
     body += '<script src="/friends-admin.js"></script>';
     body += '<script>';
-    body += 'friendsData = ' + JSON.stringify(friends.map(function(f) { return normalizeFriend(f); })) + ';';
+    body += 'friendsData = ' + JSON.stringify(friends.map(normalizeFriendItem)) + ';';
     body += '</script>';
     body += '</div></div>';
     res.send(wrapHTML("底层修改", body));
