@@ -2764,6 +2764,12 @@ app.get("/api/friends", rateLimit(60, 60000), function(req, res) {
   }
 });
 
+// ── 友链管理 JS 静态文件 ──
+app.get("/friends-admin.js", function(req, res) {
+  res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+  res.sendFile(path.join(__dirname, "friends-admin.js"));
+});
+
 // ── 启动 ──
 async function start() {
   try {
@@ -2815,21 +2821,17 @@ app.get("/config/friends", rateLimit(30, 60000), function(req, res) {
     body += '</div>';
 
     body += '<div class="form-section" style="background:#fff;border:1px solid #e8e8e8;border-radius:12px;padding:20px;box-shadow:0 12px 30px rgba(15,23,42,.04)">';
-    body += '<h3 style="margin:0 0 12px">友链列表</h3>';
-    body += '<div id="friendsList"></div>';
-    body += '<button type="button" class="btn btn-ghost btn-sm" onclick="addFriend()" style="margin-top:12px">+ 添加友链</button>';
+    body += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">';
+    body += '<h3 style="margin:0">友链列表 <span style="font-size:13px;font-weight:normal;color:#94a3b8;margin-left:4px">可拖拽排序</span></h3>';
+    body += '<button type="button" class="btn btn-primary btn-sm" onclick="addFriend()">+ 添加友链</button>';
     body += '</div>';
-    body += '<div class="form-actions"><button class="btn btn-success" onclick="saveFriends()">保存</button></div>';
+    body += '<div id="friendsList"></div>';
+    body += '<div class="form-actions" style="margin-top:16px"><button class="btn btn-success" onclick="saveFriends()">保存</button></div>';
     body += '</div></div>';
 
+    body += '<script src="/friends-admin.js"></script>';
     body += '<script>';
-    body += 'function normalizeFriend(raw){var item=raw||{};return {title:item.title||item.name||"",imgurl:item.imgurl||item.icon||"",desc:item.desc||"",siteurl:item.siteurl||item.url||"",tags:Array.isArray(item.tags)?item.tags:[],weight:Number(item.weight)||1,enabled:item.enabled!==false};}';
-    body += 'var friendsData = ' + JSON.stringify(friends.map(function(f) { return normalizeFriend(f); })) + ';';
-    body += 'function renderFriends(){var c=document.getElementById("friendsList"); c.innerHTML=""; if(!friendsData.length){c.innerHTML="<div class=\"empty-state\" style=\"padding:30px\">暂无友链</div>"; return;} friendsData.forEach(function(f,i){var item=normalizeFriend(f); var d=document.createElement("div"); d.style.cssText="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;margin-bottom:10px;align-items:center"; d.innerHTML=\'<input value="\'+(item.title||item.name||"")+\'" placeholder="名称" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" onchange="friendsData[\'+i+\'] = Object.assign(normalizeFriend(friendsData[\'+i+\']), {title:this.value,name:this.value})">\'+\'<input value="\'+(item.siteurl||item.url||"")+\'" placeholder="链接" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" onchange="friendsData[\'+i+\'] = Object.assign(normalizeFriend(friendsData[\'+i+\']), {siteurl:this.value,url:this.value})">\'+\'<input value="\'+(item.imgurl||item.icon||"")+\'" placeholder="图标 URL" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" onchange="friendsData[\'+i+\'] = Object.assign(normalizeFriend(friendsData[\'+i+\']), {imgurl:this.value,icon:this.value})">\'+\'<input value="\'+(item.desc||"\")+\'" placeholder="描述" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" onchange="friendsData[\'+i+\'] = Object.assign(normalizeFriend(friendsData[\'+i+\']), {desc:this.value})">\'+\'<button type="button" class="btn btn-danger btn-sm" onclick="friendsData.splice(\'+i+\',1);renderFriends()">×</button>\'; c.appendChild(d); }); }';
-    body += 'function addFriend(){ friendsData.push({title:"",name:"",siteurl:"",url:"",imgurl:"",icon:"",desc:"",enabled:true,weight:1,tags:[]}); renderFriends(); }';
-    body += 'function saveFriends(){ var payload = friendsData.map(function(f){ return normalizeFriend(f); }); fetch("/api/config/friends", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ friends: payload })}).then(function(r){return r.json()}).then(function(j){ if(j.ok){showToast("✅ 已保存","success")} else {showToast(j.error||"保存失败","error")} }).catch(function(){showToast("网络错误","error")}); }';
-    body += 'function publishConfig(){ saveFriends(); fetch("/api/config/publish", {method:"POST"}).then(function(r){return r.json()}).then(function(j){ if(j.ok){showToast("✅ "+j.message,"success")} else {showToast("❌ "+(j.error||"推送失败"),"error")} }); }';
-    body += 'renderFriends();';
+    body += 'friendsData = ' + JSON.stringify(friends.map(function(f) { return normalizeFriend(f); })) + ';';
     body += '</script>';
     body += '</div></div>';
     res.send(wrapHTML("底层修改", body));
