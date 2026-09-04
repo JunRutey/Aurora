@@ -44,13 +44,6 @@ export const musicPlayerConfig: MusicPlayerConfig = {
 	local: {
 		playlist: [
 		{
-			name: "还是分开",
-			artist: "张叶蕾",
-			url: "/assets/music/还是分开.mp3",
-			cover: "/assets/music/cover/还是分开.jpg",
-			lrc: "",
-		},
-		{
 			name: "素颜",
 			artist: "",
 			url: "/assets/music/素颜.mp3",
@@ -76,13 +69,6 @@ export const musicPlayerConfig: MusicPlayerConfig = {
 			artist: "",
 			url: "/assets/music/后会无期.mp3",
 			cover: "/assets/music/cover/109951169585655912.webp",
-			lrc: "",
-		},
-		{
-			name: "还是分开",
-			artist: "张叶蕾",
-			url: "/assets/music/还是分开.mp3",
-			cover: "/assets/music/cover/还是分开.jpg",
 			lrc: "",
 		},
 		]},
