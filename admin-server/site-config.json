@@ -11,6 +11,34 @@
       "url": "/assets/music/还是分开.mp3",
       "cover": "/assets/music/cover/14ce36d3d539b60041f5ebe0e650352ac65cb7aa-1788522734341.jpg",
       "lrc": ""
+    },
+    {
+      "name": "素颜",
+      "artist": "",
+      "url": "/assets/music/素颜.mp3",
+      "cover": "/assets/music/cover/素颜.jpg",
+      "lrc": ""
+    },
+    {
+      "name": "绿色",
+      "artist": "",
+      "url": "/assets/music/绿色.mp3",
+      "cover": "/assets/music/cover/绿色.jpg",
+      "lrc": ""
+    },
+    {
+      "name": "坏女孩",
+      "artist": "",
+      "url": "/assets/music/坏女孩.mp3",
+      "cover": "/assets/music/cover/坏女孩.jpg",
+      "lrc": ""
+    },
+    {
+      "name": "后会无期",
+      "artist": "",
+      "url": "/assets/music/后会无期.mp3",
+      "cover": "/assets/music/cover/后会无期.jpg",
+      "lrc": ""
     }
   ],
   "announcement": {
