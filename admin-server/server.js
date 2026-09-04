@@ -1033,7 +1033,18 @@ app.get("/api/config/music", rateLimit(30, 60000), function(req, res) {
 
 app.post("/api/config/music/upload", rateLimit(30, 60000), musicUpload.single("file"), function(req, res) {
   if (!req.file) return res.json({ ok: false, error: "没有文件" });
-  res.json({ ok: true, filename: req.file.filename });
+  var name = req.body.name;
+  if (name) {
+    var ext = path.extname(req.file.originalname);
+    var newName = name + ext;
+    var newPath = path.join(MUSIC_DIR, newName);
+    if (req.file.filename !== newName) {
+      try { fs.renameSync(req.file.path, newPath); } catch(e) {}
+    }
+    res.json({ ok: true, filename: newName });
+  } else {
+    res.json({ ok: true, filename: req.file.filename });
+  }
 });
 
 app.post("/api/config/music/update", rateLimit(30, 60000), function(req, res) {
@@ -1058,7 +1069,18 @@ app.post("/api/config/music/delete", rateLimit(30, 60000), function(req, res) {
 
 app.post("/api/config/music/cover-upload", rateLimit(30, 60000), musicCoverUpload.single("file"), function(req, res) {
   if (!req.file) return res.json({ ok: false, error: "没有文件" });
-  res.json({ ok: true, filename: req.file.filename, path: "/assets/music/cover/" + req.file.filename });
+  var name = req.body.name;
+  if (name) {
+    var ext = path.extname(req.file.originalname);
+    var newName = name + ext;
+    var newPath = path.join(MUSIC_COVER_DIR, newName);
+    if (req.file.filename !== newName) {
+      try { fs.renameSync(req.file.path, newPath); } catch(e) {}
+    }
+    res.json({ ok: true, filename: newName, path: "/assets/music/cover/" + newName });
+  } else {
+    res.json({ ok: true, filename: req.file.filename, path: "/assets/music/cover/" + req.file.filename });
+  }
 });
 
 app.get("/api/config/music/covers", rateLimit(30, 60000), function(req, res) {
@@ -1067,6 +1089,21 @@ app.get("/api/config/music/covers", rateLimit(30, 60000), function(req, res) {
     return { name: f.name, path: "/assets/music/cover/" + f.name, size: f.size };
   });
   res.json({ ok: true, covers: covers });
+});
+
+app.post("/api/config/music/cover-delete", rateLimit(30, 60000), function(req, res) {
+  var filename = req.body.filename;
+  if (!filename) return res.json({ ok: false, error: "缺少文件名" });
+  var filePath = path.join(MUSIC_COVER_DIR, filename);
+  if (!fs.existsSync(filePath)) return res.json({ ok: false, error: "文件不存在" });
+  try { fs.unlinkSync(filePath); } catch(e) { return res.json({ ok: false, error: "删除失败" }); }
+  var cfg = loadSiteConfig();
+  cfg.music.forEach(function(m) {
+    if (m.cover && m.cover.indexOf(filename) !== -1) m.cover = "";
+  });
+  saveSiteConfig(cfg);
+  syncMusicToTS(cfg);
+  res.json({ ok: true });
 });
 
 app.get("/api/config/announcement", rateLimit(30, 60000), function(req, res) {
@@ -2990,11 +3027,12 @@ app.get("/config/music", rateLimit(30, 60000), function(req, res) {
   body += 'function checkFormReady(){var n=document.getElementById("musicName").value.trim();var f=document.getElementById("musicFileInput").files[0];var b=document.getElementById("addMusicBtn");var h=document.getElementById("addMusicHint");if(n&&f){b.disabled=false;h.textContent="\u70b9\u51fb\u4fdd\u5b58\u5c06\u4e0a\u4f20\u6587\u4ef6";h.style.color="#16a34a"}else{b.disabled=true;h.textContent=f?"\u8bf7\u586b\u5199\u6b4c\u66f2\u540d":"\u8bf7\u586b\u5199\u6b4c\u66f2\u540d\u5e76\u9009\u62e9\u97f3\u4e50\u6587\u4ef6";h.style.color="#94a3b8"}}';
   body += 'document.getElementById("musicName").addEventListener("input",checkFormReady);';
   body += 'document.getElementById("musicFileInput").addEventListener("change",checkFormReady);';
-  body += 'function addNewMusic(){var name=document.getElementById("musicName").value.trim();var artist=document.getElementById("musicArtist").value.trim();var file=document.getElementById("musicFileInput").files[0];var cover=document.getElementById("musicCoverInput").files[0];if(!name||!file){showToast("\u8bf7\u586b\u5199\u6b4c\u66f2\u540d\u5e76\u9009\u62e9\u97f3\u4e50\u6587\u4ef6","error");return}showToast("\u4e0a\u4f20\u4e2d...","info",30000);var fd=new FormData();fd.append("file",file);fetch("/api/config/music/upload",{method:"POST",body:fd}).then(function(r){return r.json()}).then(function(j){if(!j.ok){showToast("\u274c \u97f3\u4e50\u4e0a\u4f20\u5931\u8d25","error");return}var url="/assets/music/"+file.name;if(cover){var cfd=new FormData();cfd.append("file",cover);fetch("/api/config/music/cover-upload",{method:"POST",body:cfd}).then(function(r){return r.json()}).then(function(cj){musicData.push({name:name,artist:artist||"",url:url,cover:cj.ok?cj.path:"",lrc:""});saveMusicList()}).catch(function(){musicData.push({name:name,artist:artist||"",url:url,cover:"",lrc:""});saveMusicList()})}else{musicData.push({name:name,artist:artist||"",url:url,cover:"",lrc:""});saveMusicList()}}).catch(function(){showToast("\u7f51\u7edc\u9519\u8bef","error")})}';
+  body += 'function addNewMusic(){var name=document.getElementById("musicName").value.trim();var artist=document.getElementById("musicArtist").value.trim();var file=document.getElementById("musicFileInput").files[0];var cover=document.getElementById("musicCoverInput").files[0];if(!name||!file){showToast("\u8bf7\u586b\u5199\u6b4c\u66f2\u540d\u5e76\u9009\u62e9\u97f3\u4e50\u6587\u4ef6","error");return}showToast("\u4e0a\u4f20\u4e2d...","info",30000);var fd=new FormData();fd.append("file",file);fd.append("name",name);fetch("/api/config/music/upload",{method:"POST",body:fd}).then(function(r){return r.json()}).then(function(j){if(!j.ok){showToast("\u274c \u97f3\u4e50\u4e0a\u4f20\u5931\u8d25","error");return}var url="/assets/music/"+j.filename;if(cover){var cfd=new FormData();cfd.append("file",cover);cfd.append("name",name);fetch("/api/config/music/cover-upload",{method:"POST",body:cfd}).then(function(r){return r.json()}).then(function(cj){musicData.push({name:name,artist:artist||"",url:url,cover:cj.ok?cj.path:"",lrc:""});saveMusicList()}).catch(function(){musicData.push({name:name,artist:artist||"",url:url,cover:"",lrc:""});saveMusicList()})}else{musicData.push({name:name,artist:artist||"",url:url,cover:"",lrc:""});saveMusicList()}}).catch(function(){showToast("\u7f51\u7edc\u9519\u8bef","error")})}';
   body += 'function saveMusicList(){fetch("/api/config/music/update",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({music:musicData})}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("\u2705 \u5df2\u4fdd\u5b58","success");setTimeout(function(){location.reload()},800)}else{showToast("\u274c \u4fdd\u5b58\u5931\u8d25","error")}})}';
   body += 'function deleteMusicFile(name){if(!confirm("\u786e\u5b9a\u5220\u9664 "+name+" \uff1f"))return;fetch("/api/config/music/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:name})}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("\u2705 \u5df2\u5220\u9664","success");setTimeout(function(){location.reload()},800)}else{showToast("\u274c \u5220\u9664\u5931\u8d25","error")}})}';
   body += 'function editFileMusic(fname){editFile=fname;var fbase=fname.replace(/\.[^.]+$/,"");var entry=musicData.find(function(m){return m.url&&m.url.indexOf(fname)!==-1})||null;document.getElementById("editFileName").textContent=fname;document.getElementById("editMusicName").value=entry?(entry.name||fbase):fbase;document.getElementById("editMusicArtist").value=entry?(entry.artist||""):"";var cv=entry?(entry.cover||""):"";document.getElementById("editMusicCoverUrl").value=cv;var pv=document.getElementById("editMusicCoverPreview");pv.innerHTML="";if(cv){var img=document.createElement("img");img.src=cv;img.style.cssText="width:80px;height:80px;object-fit:cover;border-radius:8px";img.onerror=function(){pv.innerHTML="\u266b"};pv.appendChild(img)}document.getElementById("editCoverFileInput").value="";renderCoverGrid(cv);document.getElementById("editMusicModal").style.display="flex"}';
-  body += 'function renderCoverGrid(sel){var list=document.getElementById("editCoverList");list.innerHTML="";document.getElementById("editCoverLoading").style.display=coverFilesData.length?"none":"block";coverFilesData.forEach(function(c){var div=document.createElement("div");div.style.cssText="width:60px;height:60px;border-radius:6px;overflow:hidden;cursor:pointer;border:2px solid "+(c.path===sel?"#3b82f6":"transparent")+";position:relative";div.title=c.name;div.onclick=function(){selectEditCover(c.path)};var img=document.createElement("img");img.src=c.path;img.style.cssText="width:100%;height:100%;object-fit:cover";div.appendChild(img);list.appendChild(div)})}';
+  body += 'function renderCoverGrid(sel){var list=document.getElementById("editCoverList");list.innerHTML="";document.getElementById("editCoverLoading").style.display=coverFilesData.length?"none":"block";coverFilesData.forEach(function(c){var wrap=document.createElement("div");wrap.style.cssText="width:64px;height:64px;position:relative";var div=document.createElement("div");div.style.cssText="width:60px;height:60px;border-radius:6px;overflow:hidden;cursor:pointer;border:2px solid "+(c.path===sel?"#3b82f6":"transparent")+";position:relative";div.title=c.name;div.onclick=function(){selectEditCover(c.path)};var img=document.createElement("img");img.src=c.path;img.style.cssText="width:100%;height:100%;object-fit:cover";div.appendChild(img);wrap.appendChild(div);var btn=document.createElement("button");btn.innerHTML="\u00d7";btn.style.cssText="position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#ef4444;color:#fff;border:2px solid #fff;font-size:11px;line-height:14px;text-align:center;cursor:pointer;padding:0;z-index:1";btn.title="删除封面";btn.onclick=function(e){e.stopPropagation();deleteCover(c.name)};wrap.appendChild(btn);list.appendChild(wrap)})}';
+  body += 'function deleteCover(name){if(!confirm("确定删除封面 "+name+" ？"))return;fetch("/api/config/music/cover-delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:name})}).then(function(r){return r.json()}).then(function(j){if(j.ok){showToast("\u2705 封面已删除","success");coverFilesData=coverFilesData.filter(function(c){return c.name!==name});renderCoverGrid(document.getElementById("editMusicCoverUrl").value)}else{showToast("\u274c 删除失败","error")}}).catch(function(){showToast("\u274c 网络错误","error")})}';
   body += 'function closeEditModal(){document.getElementById("editMusicModal").style.display="none";editFile=""}';
   body += 'function selectEditCover(path){document.getElementById("editMusicCoverUrl").value=path;var pv=document.getElementById("editMusicCoverPreview");pv.innerHTML="";var img=document.createElement("img");img.src=path;img.style.cssText="width:80px;height:80px;object-fit:cover;border-radius:8px";img.onerror=function(){pv.innerHTML="\u266b"};pv.appendChild(img);renderCoverGrid(path)}';
   body += 'document.getElementById("editCoverFileInput").addEventListener("change",function(){var file=this.files[0];if(!file)return;showToast("\u4e0a\u4f20\u5c01\u9762\u4e2d...","info",30000);var fd=new FormData();fd.append("file",file);fetch("/api/config/music/cover-upload",{method:"POST",body:fd}).then(function(r){return r.json()}).then(function(j){if(j.ok){document.getElementById("editMusicCoverUrl").value=j.path;var pv=document.getElementById("editMusicCoverPreview");pv.innerHTML="";var img=document.createElement("img");img.src=j.path;img.style.cssText="width:80px;height:80px;object-fit:cover;border-radius:8px";pv.appendChild(img);showToast("\u2705 \u5c01\u9762\u5df2\u4e0a\u4f20","success")}else{showToast("\u274c \u4e0a\u4f20\u5931\u8d25","error")}}).catch(function(){showToast("\u274c \u7f51\u7edc\u9519\u8bef","error")})});';

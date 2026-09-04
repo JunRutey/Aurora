@@ -9,7 +9,7 @@
       "name": "还是分开",
       "artist": "张叶蕾",
       "url": "/assets/music/还是分开.mp3",
-      "cover": "/assets/music/cover/14ce36d3d539b60041f5ebe0e650352ac65cb7aa-1788522734341.jpg",
+      "cover": "/assets/music/cover/还是分开.jpg",
       "lrc": ""
     },
     {
@@ -37,7 +37,14 @@
       "name": "后会无期",
       "artist": "",
       "url": "/assets/music/后会无期.mp3",
-      "cover": "/assets/music/cover/后会无期.jpg",
+      "cover": "/assets/music/cover/109951169585655912.webp",
+      "lrc": ""
+    },
+    {
+      "name": "还是分开",
+      "artist": "张叶蕾",
+      "url": "/assets/music/还是分开.mp3",
+      "cover": "/assets/music/cover/还是分开.jpg",
       "lrc": ""
     }
   ],
