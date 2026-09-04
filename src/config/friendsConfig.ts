@@ -30,15 +30,6 @@ export const friendsConfig: FriendLink[] = [
 		tags: ["Blog"],
 		weight: 10,
 		enabled: true,
-	},
-	{
-		title: "未命名",
-		imgurl: "",
-		desc: "",
-		siteurl: "",
-		tags: [],
-		weight: 1,
-		enabled: true,
 	}
 ];
 
