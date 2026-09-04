@@ -325,7 +325,7 @@ function syncMusicToTS(cfg) {
         '\t\t}';
     });
     content = content.replace(
-      /playlist:\s*\[[\s\S]*?\](?=\s*\})/,
+      /playlist:\s*\[[\s\S]*?\]\s*,?\s*(?=\})/,
       "playlist: [\n" + playlist.join(",\n") + ",\n\t\t]"
     );
     fs.writeFileSync(file, content, "utf-8");
