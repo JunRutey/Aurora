@@ -411,7 +411,7 @@ export class ContentCache {
 	/**
 	 * 返回缓存统计
 	 */
-	stats() {
+	stats(): { memoryKeys: number; storageKeys: number; storageBytes: number } {
 		return this.manager.stats();
 	}
 }

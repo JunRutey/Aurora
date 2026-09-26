@@ -413,6 +413,10 @@ export const zh_TW: Translation = {
 	[Key.siteStatsLastUpdate]: "最後活動",
 	[Key.siteStatsDaysAgo]: "{days} 天前",
 	[Key.siteStatsDays]: "{days} 天",
+	[Key.siteStatsTotalViews]: "總訪問量",
+	[Key.siteStatsTotalVisitors]: "總訪客數",
+	[Key.siteStatsViewsUnit]: "次",
+	[Key.siteStatsVisitorsUnit]: "人",
 	[Key.today]: "今天",
 
 	// 站點資訊

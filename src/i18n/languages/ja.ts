@@ -419,6 +419,10 @@ export const ja: Translation = {
 	[Key.siteStatsLastUpdate]: "最終活動",
 	[Key.siteStatsDaysAgo]: "{days} 日前",
 	[Key.siteStatsDays]: "{days} 日",
+	[Key.siteStatsTotalViews]: "総閲覧数",
+	[Key.siteStatsTotalVisitors]: "総訪問者数",
+	[Key.siteStatsViewsUnit]: "回",
+	[Key.siteStatsVisitorsUnit]: "人",
 	[Key.today]: "今日",
 
 	// サイト情報

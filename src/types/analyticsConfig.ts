@@ -17,7 +17,7 @@ export type AnalyticsConfig = {
 		// 访问统计显示配置
 		stats?: {
 			enabled?: boolean; // 是否启用访问统计显示
-			mode?: "api" | "iframe"; // 显示方式
+			mode?: "api" | "iframe" | "link"; // 显示方式："api"=API 拉取数据 | "iframe"=嵌入面板 | "link"=链接跳转
 			shareUrl?: string; // Umami Cloud Share URL（iframe 模式）
 			apiUrl?: string; // Umami Cloud API 地址（api 模式）
 			apiKey?: string; // Umami API Key（api 模式，需要付费计划）

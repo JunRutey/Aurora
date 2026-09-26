@@ -88,7 +88,7 @@ export class CacheManager {
 	 * 读取缓存，三级查找: memory → localStorage → null
 	 * 如果配置了 TTL，过期条目会被自动淘汰
 	 */
-	get<T>(key: string, ttl = this.config.defaultTTL): T | null {
+	get<T>(key: string, ttl: number = this.config.defaultTTL): T | null {
 		// 1. 内存命中
 		if (this.memory.has(key)) {
 			this.emit("hit", { key, layer: "memory" });
@@ -115,7 +115,7 @@ export class CacheManager {
 	/**
 	 * 写入缓存，同时写入内存和 localStorage
 	 */
-	set<T>(key: string, data: T, ttl = this.config.defaultTTL): void {
+	set<T>(key: string, data: T, ttl: number = this.config.defaultTTL): void {
 		const entry: CacheEntry<T> = {
 			data,
 			fetchedAt: Date.now(),

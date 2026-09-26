@@ -213,6 +213,12 @@ export type SiteConfig = {
 		style?: "text" | "badge";
 	};
 
+	// 不蒜子访问统计配置
+	busuanzi?: {
+		// 是否在站点统计组件中显示不蒜子访问量/访客数
+		enabled?: boolean;
+	};
+
 	// 分页配置
 	pagination: {
 		postsPerPage: number; // 每页显示的文章数量

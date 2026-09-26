@@ -4,7 +4,7 @@ import { getSortedPosts } from "@/utils/content-utils";
 import { formatDateI18nWithTime } from "@/utils/date-utils";
 import { url } from "@/utils/url-utils";
 
-export async function GET(context: APIContext) {
+export async function GET(context: APIContext): Promise<Response> {
 	const posts = await getSortedPosts();
 
 	const items = posts

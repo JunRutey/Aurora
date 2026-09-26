@@ -413,6 +413,8 @@ export const zh_CN: Translation = {
 	[Key.siteStatsDays]: "{days} 天",
 	[Key.siteStatsTotalViews]: "总访问量",
 	[Key.siteStatsTotalVisitors]: "总访客数",
+	[Key.siteStatsViewsUnit]: "次",
+	[Key.siteStatsVisitorsUnit]: "人",
 	[Key.today]: "今天",
 
 	// 站点信息

@@ -422,6 +422,10 @@ export const ru: Translation = {
 	[Key.siteStatsLastUpdate]: "Последняя активность",
 	[Key.siteStatsDaysAgo]: "{days} дней назад",
 	[Key.siteStatsDays]: "{days} дней",
+	[Key.siteStatsTotalViews]: "Всего просмотров",
+	[Key.siteStatsTotalVisitors]: "Всего посетителей",
+	[Key.siteStatsViewsUnit]: "раз",
+	[Key.siteStatsVisitorsUnit]: "чел.",
 	[Key.today]: "Сегодня",
 
 	// Информация о сайте
