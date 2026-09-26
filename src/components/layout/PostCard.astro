@@ -162,13 +162,12 @@ const minutes = remarkPluginFrontmatter.minutes;
       className="mb-4 post-meta card-header-meta"
     />
 
-    <!-- description -->
+    <!-- description：仅展示截断后的摘要，不再把全文塞进 title 提示 -->
     <div
       class:list={[
         "transition text-75 md:pr-4 description grow",
         { "description-clamped": shouldClampDescription },
       ]}
-      title={descriptionText}
     >
       {descriptionText}
     </div>
