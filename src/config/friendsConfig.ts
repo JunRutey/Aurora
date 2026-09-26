@@ -29,15 +29,6 @@ export const friendsConfig: FriendLink[] = [
 		tags: ["Blog"],
 		weight: 10,
 		enabled: true,
-	},
-	{
-		title: "by",
-		imgurl: "https://blog.pljzy.top/_astro/logo_2.dahuuky2_9DAHU.webp",
-		desc: "测试",
-		siteurl: "https://blog.pljzy.top",
-		tags: ["1"],
-		weight: 1,
-		enabled: true,
 	}
 ];
 
