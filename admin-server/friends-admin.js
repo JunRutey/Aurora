@@ -23,14 +23,17 @@ function mkInput(label, value, idx, field, type) {
   var ph = type === "number" ? "1" : (type === "url" ? "https://..." : "");
   var extra = type === "number" ? ' min="1" step="1"' : "";
   var val = String(value).replace(/"/g, "&quot;");
-  var isNum = type === "number" ? ",true" : "";
+  // 注意：不要在这里拼内联 onchange —— 字段名经 JSON.stringify 后带双引号，会把 HTML
+  // 属性提前截断（生成 updateField(0,"title",...) 这种非法片段）导致事件彻底失效。
+  // 这里只输出 data-* 标记，由 bindFieldInputs() 统一绑定监听。
   return '<div><p style="font-size:11px;color:#94a3b8;margin-bottom:4px">' + label + '</p>' +
     '<input type="' + type + '" value="' + val + '"' + extra + ' placeholder="' + ph + '" ' +
-    'style="width:100%;padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;box-sizing:border-box" ' +
-    'onchange="updateField(' + idx + ',' + JSON.stringify(field) + ',this.value' + isNum + ')" /></div>';
+    'data-field="' + field + '" data-index="' + idx + '" ' +
+    'style="width:100%;padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;box-sizing:border-box" /></div>';
 }
 
 function updateField(idx, field, value, isNum) {
+  if (!friendsData[idx]) return;
   if (field === "tags") {
     friendsData[idx].tags = value.split(",").map(function(t) { return t.trim(); }).filter(Boolean);
   } else if (isNum) {
@@ -38,6 +41,17 @@ function updateField(idx, field, value, isNum) {
   } else {
     friendsData[idx][field] = value;
   }
+}
+
+// 绑定卡片里的输入框：用 input 事件，边输入边写入 friendsData（不依赖失焦）
+function bindFieldInputs(card) {
+  card.querySelectorAll("input[data-field]").forEach(function(el) {
+    el.addEventListener("input", function() {
+      var idx = Number(el.getAttribute("data-index"));
+      var field = el.getAttribute("data-field");
+      updateField(idx, field, el.value, field === "weight");
+    });
+  });
 }
 
 function renderFriends() {
@@ -99,6 +113,7 @@ function renderFriends() {
     h += '<button type="button" class="btn btn-danger btn-sm" onclick="friendsData.splice(' + i + ',1);renderFriends()">删除</button>';
     h += '</div></div></div>';
     card.innerHTML = h;
+    bindFieldInputs(card);
     c.appendChild(card);
   });
 }
@@ -123,6 +138,19 @@ function addFriend() {
 
 function saveFriends() {
   var payload = friendsData.map(function(f) { return normalizeFriend(f); });
+  // 启用中的友链必须填写站点名称与站点链接，否则前台会出现「未命名」空卡片
+  var invalid = [];
+  payload.forEach(function(f, i) {
+    if (!f.enabled) return;
+    var missing = [];
+    if (!f.title || f.title === "未命名") missing.push("站点名称");
+    if (!f.siteurl) missing.push("站点链接");
+    if (missing.length) invalid.push("第 " + (i + 1) + " 条缺少" + missing.join("、"));
+  });
+  if (invalid.length) {
+    showToast("\u274c " + invalid.join("；") + "，请填写后再保存", "error", 6000);
+    return Promise.resolve(false);
+  }
   return fetch("/api/config/friends", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
