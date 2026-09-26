@@ -47,6 +47,31 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 		],
 	});
 
+	// 链接及其子菜单
+	links.push({
+		name: "链接",
+		url: "#",
+		icon: "material-symbols:link-rounded",
+		children: [
+			// 哔哩哔哩主页
+			{
+				name: "哔哩哔哩",
+				url: "https://space.bilibili.com/1390351725",
+				external: true,
+				icon: "fa7-brands:bilibili",
+			},
+
+			// 米游社主页
+			{
+				name: "米游社",
+				url: "https://www.miyoushe.com/ys/accountCenter/postList?id=402652056",
+				external: true,
+				// 自定义本地图标（src/icons/miyoushe.svg，本地图标引用不带前缀）
+				icon: "miyoushe",
+			},
+		],
+	});
+
 	// 我的及其子菜单
 	links.push({
 		name: "我的",
@@ -61,14 +86,6 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 
 			// 书签导航
 			LinkPresets.Booknav,
-
-			// 哔哩哔哩主页
-			{
-				name: "哔哩哔哩",
-				url: "https://space.bilibili.com/1390351725",
-				external: true,
-				icon: "fa7-brands:bilibili",
-			},
 		],
 	});
 
