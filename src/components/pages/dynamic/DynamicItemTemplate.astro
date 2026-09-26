@@ -21,12 +21,19 @@ const profileUrl = url(dynamicConfig.profileUrl || "/about/");
 	<dynamic-entry class="dynamic-entry card-base" data-dynamic-entry>
 		<article>
 			<header class="dynamic-entry-header">
-				<a href={profileUrl} class="dynamic-avatar" aria-label={profileLabel}>
+				{/* 内联尺寸兜底：动态页专属 CSS 未加载（缓存/404）时，头像不会撑爆布局 */}
+				<a
+					href={profileUrl}
+					class="dynamic-avatar"
+					style="display:block;width:3rem;height:3rem;overflow:hidden;border-radius:50%"
+					aria-label={profileLabel}
+				>
 					<ImageWrapper
 						src={profileConfig.avatar || ""}
 						alt={profileConfig.name}
-						widths={[96]}
-						sizes="48px"
+						layout="none"
+						width={96}
+						height={96}
 						loading="lazy"
 						fadeIn={false}
 					/>
