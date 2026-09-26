@@ -27,6 +27,8 @@ const DEFAULTS: Record<string, string> = {
 	wallpaperMode: "normal",
 	overlayOpacity: "0.6",
 	overlayBlur: "15",
+	// 必须与 src/config/backgroundWallpaper.ts 的 overlay.cardOpacity 保持一致，
+	// 这里优先级高于调用方传入的默认值，不一致会导致"恢复默认"反而把蒙版变透明
 	overlayCardOpacity: "0.85",
 	wavesEnabled: "true",
 	gradientEnabled: "true",

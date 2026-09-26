@@ -105,7 +105,8 @@ dynamic-feed {
 	border: 1px solid var(--line-divider);
 	border-radius: var(--radius-large);
 	outline: none;
-	background: transparent;
+	/* 使用主题控件底色，任何壁纸/主题模式下都不再是"裸文字漂浮" */
+	background: var(--btn-regular-bg);
 	color: rgb(0 0 0 / 90%);
 	padding: 0.625rem 1rem 0.625rem 2.75rem;
 	font-size: 0.9rem;
@@ -145,7 +146,8 @@ dynamic-feed {
 	border: 1px solid var(--line-divider);
 	border-radius: var(--radius-large);
 	outline: none;
-	background: var(--card-bg);
+	/* 与搜索框保持一致，使用主题控件底色 */
+	background: var(--btn-regular-bg);
 	color: rgb(0 0 0 / 90%);
 	color-scheme: light;
 	padding: 0.625rem 2.25rem 0.625rem 2.35rem;
@@ -748,7 +750,7 @@ dynamic-feed {
 
 :root.dark .dynamic-search input,
 :root.dark .dynamic-year-select select {
-	background: transparent;
+	background: var(--btn-regular-bg);
 	color: rgb(255 255 255 / 90%);
 	color-scheme: dark;
 }
@@ -758,15 +760,8 @@ dynamic-feed {
 	color: rgb(255 255 255 / 90%);
 }
 
-/* 透明模式适配 */
-body.wallpaper-transparent .dynamic-search input {
-	background: transparent;
-}
-
-body.wallpaper-transparent .dynamic-year-select select {
-	background: transparent;
-}
-
+/* 透明模式适配：搜索框/下拉的底色统一由 --btn-regular-bg 提供，
+   不再强制 transparent，避免在壁纸模式下变成"裸文字漂浮" */
 body.wallpaper-transparent .dynamic-year-select select option {
 	background: var(--card-bg);
 }

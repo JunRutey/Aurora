@@ -175,7 +175,11 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 		// 背景模糊度，单位px
 		blur: 1,
 		// 卡片透明度，0-1之间，值越小越透明
-		cardOpacity: 0.47,
+		// 注意：这是「透明覆盖 / 全屏壁纸」模式下卡片蒙版透明度的统一来源——
+		// 显示设置面板的初始值、「恢复默认」目标值、Layout 内联脚本的兜底值都取自这里。
+		// 如需修改，请同步修改 src/cache/settings-cache.ts 的 overlayCardOpacity，
+		// 两处不一致会导致"面板显示一个值、重置后又变成另一个值"，让人误以为卡片蒙版丢了
+		cardOpacity: 0.85,
 	},
 	// 全屏壁纸模式特有配置
 	// 全屏模式下壁纸固定全屏显示，首屏居中标题，内容区在首屏之下、下滑时覆盖壁纸
