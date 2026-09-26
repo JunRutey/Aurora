@@ -68,7 +68,7 @@ export const musicPlayerConfig: MusicPlayerConfig = {
 			name: "后会无期",
 			artist: "",
 			url: "/assets/music/后会无期.mp3",
-			cover: "/assets/music/cover/109951169585655912.webp",
+			cover: "/assets/music/cover/后会无期.jpg",
 			lrc: "",
 		},
 		]},

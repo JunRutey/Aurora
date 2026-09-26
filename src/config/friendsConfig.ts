@@ -1,8 +1,7 @@
 import type { FriendLink, FriendsPageConfig } from "../types/friendsConfig";
 
-// 可以在src/content/spec/friends.md中编写友链页面下方的自定义内容
+// 可以在src/content/spec/friends.mdx中编写友链页面下方的自定义内容
 
-// 友链页面配置
 export const friendsPageConfig: FriendsPageConfig = {
 	// 页面标题，如果留空则使用 i18n 中的翻译
 	title: "",
@@ -29,6 +28,15 @@ export const friendsConfig: FriendLink[] = [
 		siteurl: "https://blog.cuteleaf.cn",
 		tags: ["Blog"],
 		weight: 10,
+		enabled: true,
+	},
+	{
+		title: "未命名",
+		imgurl: "",
+		desc: "",
+		siteurl: "",
+		tags: [],
+		weight: 1,
 		enabled: true,
 	}
 ];
