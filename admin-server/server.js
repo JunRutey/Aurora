@@ -353,55 +353,72 @@ function normalizeFriendItem(f) {
   return normalized;
 }
 
+// 从已有文件中抽取 friendsPageConfig 块，避免后台保存时覆盖页面自定义配置
+function readExistingFriendsPageConfig(file) {
+  try {
+    if (!fs.existsSync(file)) return null;
+    var old = fs.readFileSync(file, "utf-8");
+    var m = old.match(/export const friendsPageConfig[\s\S]*?\n\};/);
+    return m ? m[0] + "\n\n" : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// 文件不存在或无法抽取时的默认页面配置块
+function defaultFriendsPageConfigBlock() {
+  return [
+    '// 友链页面配置\n',
+    'export const friendsPageConfig: FriendsPageConfig = {\n',
+    '\t// 页面标题，如果留空则使用 i18n 中的翻译\n',
+    '\ttitle: "",\n',
+    '\n',
+    '\t// 页面描述文本，如果留空则使用 i18n 中的翻译\n',
+    '\tdescription: "",\n',
+    '\n',
+    '\t// 是否显示底部自定义内容（friends.mdx 中的内容）\n',
+    '\tshowCustomContent: true,\n',
+    '\n',
+    '\t// 是否显示评论区，需要先在commentConfig.ts启用评论系统\n',
+    '\tshowComment: true,\n',
+    '\n',
+    '\t// 是否开启随机排序配置，如果开启，就会忽略权重，构建时进行一次随机排序\n',
+    '\trandomizeSort: false,\n',
+    '};\n',
+    '\n'
+  ].join("");
+}
+
 function syncFriendsToTS(cfg) {
   var file = path.join(CONFIG_DIR, "friendsConfig.ts");
   try {
     var friends = Array.isArray(cfg.friends) ? cfg.friends.map(normalizeFriendItem) : [];
-    var rendered = [];
-    friends.forEach(function(f) {
-      var name = String(f.title || "未命名").replace(/"/g, '\\"');
-      var imgurl = String(f.imgurl || "").replace(/"/g, '\\"');
-      var desc = String(f.desc || "").replace(/"/g, '\\"');
-      var siteurl = String(f.siteurl || "").replace(/"/g, '\\"');
-      var tags = Array.isArray(f.tags) ? f.tags.map(function(t) { return '"' + String(t).replace(/"/g, '\\"') + '"'; }).join(", ") : "";
-      var weight = Number(f.weight) || 1;
-      var enabled = f.enabled !== false;
-      rendered.push(
-        '\t{\n' +
-        '\t\ttitle: "' + name + '",\n' +
-        '\t\timgurl: "' + imgurl + '",\n' +
-        '\t\tdesc: "' + desc + '",\n' +
-        '\t\tsiteurl: "' + siteurl + '",\n' +
-        '\t\ttags: [' + tags + '],\n' +
+    var rendered = friends.map(function(f) {
+      var tags = (Array.isArray(f.tags) ? f.tags : [])
+        .map(function(t) { return String(t).trim(); })
+        .filter(Boolean);
+      var weight = Number(f.weight);
+      if (!isFinite(weight)) weight = 1;
+      return '\t{\n' +
+        '\t\ttitle: ' + JSON.stringify(String(f.title || "未命名")) + ',\n' +
+        '\t\timgurl: ' + JSON.stringify(String(f.imgurl || "")) + ',\n' +
+        '\t\tdesc: ' + JSON.stringify(String(f.desc || "")) + ',\n' +
+        '\t\tsiteurl: ' + JSON.stringify(String(f.siteurl || "")) + ',\n' +
+        '\t\ttags: [' + tags.map(function(t) { return JSON.stringify(t); }).join(", ") + '],\n' +
         '\t\tweight: ' + weight + ',\n' +
-        '\t\tenabled: ' + enabled + ',\n' +
-        '\t}'
-      );
+        '\t\tenabled: ' + (f.enabled !== false) + ',\n' +
+        '\t}';
     });
+
+    // 保留用户已有的页面配置，仅在缺失时使用默认值
+    var pageConfigBlock = readExistingFriendsPageConfig(file) || defaultFriendsPageConfigBlock();
 
     var content = [
       'import type { FriendLink, FriendsPageConfig } from "../types/friendsConfig";\n',
       '\n',
-      '// 可以在src/content/spec/friends.md中编写友链页面下方的自定义内容\n',
+      '// 可以在src/content/spec/friends.mdx中编写友链页面下方的自定义内容\n',
       '\n',
-      '// 友链页面配置\n',
-      'export const friendsPageConfig: FriendsPageConfig = {\n',
-      '\t// 页面标题，如果留空则使用 i18n 中的翻译\n',
-      '\ttitle: "",\n',
-      '\n',
-      '\t// 页面描述文本，如果留空则使用 i18n 中的翻译\n',
-      '\tdescription: "",\n',
-      '\n',
-      '\t// 是否显示底部自定义内容（friends.mdx 中的内容）\n',
-      '\tshowCustomContent: true,\n',
-      '\n',
-      '\t// 是否显示评论区，需要先在commentConfig.ts启用评论系统\n',
-      '\tshowComment: true,\n',
-      '\n',
-      '\t// 是否开启随机排序配置，如果开启，就会忽略权重，构建时进行一次随机排序\n',
-      '\trandomizeSort: false,\n',
-      '};\n',
-      '\n',
+      pageConfigBlock,
       '// 友链配置\n',
       'export const friendsConfig: FriendLink[] = [\n',
       (rendered.length ? rendered.join(',\n') + '\n' : ''),
@@ -1303,7 +1320,7 @@ app.get("/", function(req, res) {
     body += '<a href="/staging" class="quick-link">' + icInbox + ' 暂存列表' + (stagedCount > 0 ? '<span class="count-badge">' + stagedCount + '</span>' : '') + '</a>';
     body += '<a href="/config/announcement" class="quick-link">' + icAnnounce + ' 公告管理</a>';
     body += '<a href="/config/about" class="quick-link">' + icUser + ' 关于我</a>';
-    body += '<a href="/config/friends" class="quick-link">' + icUser + ' 底层修改</a>';
+    body += '<a href="/config/friends" class="quick-link">' + icUser + ' 友链管理</a>';
     body += '</div></div>';
 
     var stagingList = loadStaging();
@@ -2616,10 +2633,7 @@ function writeSiteConfigFromObj(cfg) {
   md += "\n## Video\n\nurl: " + (cfg.video || "") + "\n";
   md += "\n## BGM\n\nsong: " + (cfg.bgmSong || "") + "\nid: " + (cfg.bgmId || "") + "\n";
   md += "\n## Announcement\n\n" + (cfg.announcement || "") + "\n";
-  md += "\n## Friends\n\n";
-  (cfg.friends || []).forEach(function(f) {
-    md += "- name: " + (f.name || "") + "\n  url: " + (f.url || "") + "\n  icon: " + (f.icon || "") + "\n  desc: " + (f.desc || "") + "\n";
-  });
+  // 友链已迁移到 src/config/friendsConfig.ts，不再写入 site-config.md
   // about 内容现在存储在 src/content/spec/about.md，不再写入 site-config.md
   writeSiteConfig(md);
 }
@@ -2628,7 +2642,6 @@ function writeSiteConfigFromObj(cfg) {
 app.get("/site-config", rateLimit(30, 60000), function(req, res) {
   try {
     var cfg = parseSiteConfig(readSiteConfig());
-    var friendsJSON = JSON.stringify(cfg.friends);
     // about 内容从 src/content/spec/about.md 读取
     var aboutPath = path.join(CONTENT_DIR, "spec", "about.md");
     var aboutContent = fs.existsSync(aboutPath) ? fs.readFileSync(aboutPath, "utf-8") : "";
@@ -2667,11 +2680,11 @@ app.get("/site-config", rateLimit(30, 60000), function(req, res) {
     body += '<textarea id="announcement" rows="3" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px;resize:vertical" placeholder="支持 Markdown">' + esc(cfg.announcement) + '</textarea>';
     body += '</div>';
 
-    // Friends
-    body += '<div style="background:#fff;border-radius:10px;border:1px solid #e8e8f0;padding:20px;margin-bottom:16px">';
+    // 友链已统一到独立的「友链管理」页维护，避免两套数据源互相覆盖
+    body += '<div style="background:#fff;border-radius:10px;border:1px solid #e8e8e8;padding:20px;margin-bottom:16px">';
     body += '<h3 style="margin:0 0 12px;font-size:15px">👥 友链</h3>';
-    body += '<div id="friendsList"></div>';
-    body += '<button type="button" class="btn btn-ghost btn-sm" onclick="addFriend()" style="margin-top:8px">+ 添加友链</button>';
+    body += '<p style="margin:0 0 12px;font-size:13px;color:#64748b">友链已统一在「友链管理」页维护（保存后写入 src/config/friendsConfig.ts），此处不再提供编辑。</p>';
+    body += '<a href="/config/friends" class="btn btn-primary btn-sm">前往友链管理</a>';
     body += '</div>';
 
     // About
@@ -2687,19 +2700,6 @@ app.get("/site-config", rateLimit(30, 60000), function(req, res) {
     body += '</form></div>';
 
     body += '<script>';
-    body += 'var friendsData = ' + friendsJSON + ';';
-    body += 'function renderFriends() {';
-    body += '  var c = document.getElementById("friendsList"); c.innerHTML = "";';
-    body += '  friendsData.forEach(function(f, i) {';
-    body += '    var d = document.createElement("div"); d.style.cssText = "display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center";';
-    body += '    d.innerHTML = \'<input value="\' + (f.name||"") + \'" placeholder="名称" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" onchange="friendsData[\' + i + \'].name=this.value">\' + \'<input value="\' + (f.url||"") + \'" placeholder="链接" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" onchange="friendsData[\' + i + \'].url=this.value">\' + \'<input value="\' + (f.icon||"") + \'" placeholder="图标 URL" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" onchange="friendsData[\' + i + \'].icon=this.value">\' + \'<input value="\' + (f.desc||"") + \'" placeholder="描述" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" onchange="friendsData[\' + i + \'].desc=this.value">\' + \'<button type="button" class="btn btn-danger btn-sm" onclick="friendsData.splice(\' + i + \',1);renderFriends()">×</button>\';';
-    body += '    c.appendChild(d);';
-    body += '  });';
-    body += '}';
-    body += 'function addFriend() { friendsData.push({name:"",url:"",icon:"",desc:""}); renderFriends(); }';
-    body += '';
-    body += 'renderFriends();';
-    body += '';
     body += 'document.getElementById("siteConfigForm").addEventListener("submit", function(e) {';
     body += '  e.preventDefault();';
     body += '  var btn = document.getElementById("saveBtn"); btn.textContent = "保存中..."; btn.disabled = true;';
@@ -2709,7 +2709,6 @@ app.get("/site-config", rateLimit(30, 60000), function(req, res) {
     body += '    bgmSong: document.getElementById("bgmSong").value,';
     body += '    bgmId: document.getElementById("bgmId").value,';
     body += '    announcement: document.getElementById("announcement").value,';
-    body += '    friends: friendsData,';
     body += '    about: document.getElementById("about").value';
     body += '  };';
     body += '  fetch("/api/site-config", {';
@@ -2731,6 +2730,8 @@ app.get("/site-config", rateLimit(30, 60000), function(req, res) {
 app.post("/api/site-config", rateLimit(30, 60000), function(req, res) {
   try {
     var data = req.body;
+    // 友链统一由 /api/config/friends 维护，这里丢弃旧的 md 格式友链字段
+    if (data && Object.prototype.hasOwnProperty.call(data, "friends")) delete data.friends;
     // about 内容保存到 src/content/spec/about.md
     var aboutPath = path.join(CONTENT_DIR, "spec", "about.md");
     var aboutDir = path.dirname(aboutPath);
@@ -2754,11 +2755,12 @@ app.get("/api/announcement", rateLimit(60, 60000), function(req, res) {
   }
 });
 
-// ── 友链 API ──
+// ── 友链 API（统一读取 admin-server/site-config.json，字段与 src/types/friendsConfig.ts 保持一致） ──
 app.get("/api/friends", rateLimit(60, 60000), function(req, res) {
   try {
-    var cfg = parseSiteConfig(readSiteConfig());
-    res.json({ ok: true, friends: cfg.friends });
+    var cfg = loadSiteConfig();
+    var friends = (Array.isArray(cfg.friends) ? cfg.friends : []).map(normalizeFriendItem);
+    res.json({ ok: true, friends: friends });
   } catch(e) {
     res.json({ ok: false, error: e.message, friends: [] });
   }
@@ -2806,7 +2808,7 @@ app.get("/config/friends", rateLimit(30, 60000), function(req, res) {
 
     var body = '<div class="container" style="max-width:1200px;">';
     body += '<header style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px">';
-    body += '<h1 style="margin:0;font-size:22px">底层修改</h1>';
+    body += '<h1 style="margin:0;font-size:22px">友链管理</h1>';
     body += '<div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="publishConfig()">推送更新</button><a href="/" class="btn btn-ghost">返回后台</a></div>';
     body += '</header>';
 
@@ -2825,6 +2827,7 @@ app.get("/config/friends", rateLimit(30, 60000), function(req, res) {
     body += '<h3 style="margin:0">友链列表 <span style="font-size:13px;font-weight:normal;color:#94a3b8;margin-left:4px">可拖拽排序</span></h3>';
     body += '<button type="button" class="btn btn-primary btn-sm" onclick="addFriend()">+ 添加友链</button>';
     body += '</div>';
+    body += '<p style="font-size:12px;color:#94a3b8;margin:0 0 12px">保存后自动写入 <code>src/config/friendsConfig.ts</code>（其中 <code>friendsPageConfig</code> 会原样保留）；前台 <b>/friends/</b> 页面即时生效。「推送更新」= 保存 + git 提交推送。</p>';
     body += '<div id="friendsList"></div>';
     body += '<div class="form-actions" style="margin-top:16px"><button class="btn btn-success" onclick="saveFriends()">保存</button></div>';
     body += '</div></div>';
@@ -2832,9 +2835,9 @@ app.get("/config/friends", rateLimit(30, 60000), function(req, res) {
     body += '<script src="/friends-admin.js"></script>';
     body += '<script>';
     body += 'friendsData = ' + JSON.stringify(friends.map(normalizeFriendItem)) + ';';
+    body += 'renderFriends();';
     body += '</script>';
-    body += '</div></div>';
-    res.send(wrapHTML("底层修改", body));
+    res.send(wrapHTML("友链管理", body));
   } catch (e) {
     res.status(500).send(wrapHTML("错误", '<div class="container"><h1>错误</h1><pre>' + esc(e.message) + '</pre></div>'));
   }

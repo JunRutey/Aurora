@@ -90,8 +90,8 @@ function renderFriends() {
     h += mkInput("站点描述", item.desc, i, "desc");
     h += '</div>';
     h += '<div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">';
-    h += mkInput("标签(逗号分隔)", item.tags.join(","), i, "tags");
-    h += mkInput("权重", item.weight, i, "weight", "number");
+    h += mkInput("标签（逗号分隔，前台筛选用）", item.tags.join(","), i, "tags");
+    h += mkInput("权重（越大越靠前）", item.weight, i, "weight", "number");
     h += '<div><p style="font-size:11px;color:#94a3b8;margin-bottom:4px">启用</p>';
     h += '<label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">';
     h += '<input type="checkbox" ' + (item.enabled ? "checked" : "") + ' onchange="friendsData[' + i + '].enabled=this.checked" />';
@@ -123,20 +123,33 @@ function addFriend() {
 
 function saveFriends() {
   var payload = friendsData.map(function(f) { return normalizeFriend(f); });
-  fetch("/api/config/friends", {
+  return fetch("/api/config/friends", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ friends: payload })
   }).then(function(r) { return r.json(); }).then(function(j) {
-    if (j.ok) { showToast("\u2705 已保存", "success"); }
-    else { showToast(j.error || "保存失败", "error"); }
-  }).catch(function() { showToast("网络错误", "error"); });
+    if (j.ok) { showToast("\u2705 已保存到 friendsConfig.ts", "success"); return true; }
+    showToast(j.error || "保存失败", "error");
+    return false;
+  }).catch(function() { showToast("网络错误", "error"); return false; });
 }
 
 function publishConfig() {
-  saveFriends();
-  fetch("/api/config/publish", { method: "POST" }).then(function(r) { return r.json(); }).then(function(j) {
-    if (j.ok) { showToast("\u2705 " + j.message, "success"); }
-    else { showToast("\u274c " + (j.error || "推送失败"), "error"); }
+  // 先保存成功再推送，避免把旧配置推到仓库
+  saveFriends().then(function(ok) {
+    if (!ok) return;
+    fetch("/api/config/publish", { method: "POST" }).then(function(r) { return r.json(); }).then(function(j) {
+      if (j.ok) { showToast("\u2705 " + j.message, "success"); }
+      else { showToast("\u274c " + (j.error || "推送失败"), "error"); }
+    }).catch(function() { showToast("\u274c 网络错误", "error"); });
   });
+}
+
+// 页面加载后自动渲染（页面内联脚本也会调用 renderFriends，这里做双保险）
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", function() {
+    if (document.getElementById("friendsList")) renderFriends();
+  });
+} else if (document.getElementById("friendsList")) {
+  renderFriends();
 }
