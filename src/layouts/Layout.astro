@@ -3,6 +3,8 @@ import GoogleAnalytics from "@components/analytics/GoogleAnalytics.astro";
 import La51Analytics from "@components/analytics/La51Analytics.astro";
 import MicrosoftClarity from "@components/analytics/MicrosoftClarity.astro";
 import UmamiAnalytics from "@components/analytics/UmamiAnalytics.astro";
+import CacheBootstrap from "@components/features/CacheBootstrap.astro";
+import CacheInit from "@components/features/CacheInit.astro";
 import CodeGroupManager from "@components/features/CodeGroupManager.astro";
 import FancyboxManager from "@components/features/FancyboxManager.astro";
 import FontSetup from "@components/features/FontSetup.astro";
@@ -11,9 +13,8 @@ import MusicManager from "@components/features/MusicManager.astro";
 import MusicPlayerView from "@components/features/MusicPlayerView.astro";
 // 樱花特效已移除
 import WavesEffect from "@components/features/WavesEffect.astro";
-import CacheBootstrap from "@components/features/CacheBootstrap.astro";
-import CacheInit from "@components/features/CacheInit.astro";
 import ConfigCarrier from "@components/layout/ConfigCarrier.astro";
+import Analytics from "@vercel/analytics/astro";
 
 import {
 	analyticsConfig,
@@ -131,6 +132,7 @@ const siteLogo = await getSiteLogo();
     <style is:inline>
 			@layer properties, theme, base, components, utilities;
 		</style>
+    <Analytics />
     {analyticsConfig?.googleAnalyticsId && (
             <GoogleAnalytics analyticsId={analyticsConfig.googleAnalyticsId} />
     )}
@@ -494,7 +496,7 @@ const siteLogo = await getSiteLogo();
     <MusicManager />
     <slot />
 
-    <!-- 播放器视图脚本：必须在 <slot /> 之后（解析到它时所有 widget 的 DOM 要已存在），
+    <!-- 播放器视图脚本：必须在 <slot /> 之后（解析到它时���有 widget 的 DOM 要已存在），
          且在 MusicManager 之后（swup 重跑按文档顺序，window.__fireflyMusic 得先就位） -->
     {(musicPlayerConfig.showInNavbar || musicPlayerConfig.showInSidebar !== false) && (
       <MusicPlayerView />
