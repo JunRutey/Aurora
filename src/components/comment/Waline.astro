@@ -77,31 +77,57 @@ const walineJSUrl = "https://unpkg.com/@waline/client@v3/dist/waline.js";
   observer.observe(document.documentElement, { attributes: true });
 </script>
 
-<style>
+<style is:global>
+  /* Waline 的评论 DOM 由客户端 JS 动态渲染，Astro 的 scoped 样式无法命中，因此这里使用全局样式 */
   #waline {
     width: 100%;
     max-width: 100%;
     margin: 0 auto;
     padding: 0;
+
+    /*
+     * Waline v3 实际支持的 CSS 变量。
+     * 注意：旧写法 --waline-text-color / --waline-secondary-color 在本版本中并不存在，
+     * 真正生效的是 --waline-color（正文）与 --waline-info-color（信息文字）。
+     */
+    --waline-theme-color: var(--primary);
+    --waline-border-color: var(--line-color);
+    --waline-bg-color: var(--card-bg);
+
+    /* 字体加黑：正文（Waline 默认 #444） */
+    --waline-color: rgba(0, 0, 0, 0.9);
+    /* 字体加黑：时间、浏览器、系统等信息文字（Waline 默认 #999） */
+    --waline-info-color: rgba(0, 0, 0, 0.78);
+    /* 字体加黑：昵称等次级文字（Waline 默认 #666） */
+    --waline-dark-grey: rgba(0, 0, 0, 0.85);
+    /* 信息标签底色（Waline 默认 #f8f8f8） */
+    --waline-info-bg-color: rgba(0, 0, 0, 0.05);
   }
 
-  /* Waline 样式覆盖 */
-  :root {
-    --waline-theme-color: var(--primary);
-    --waline-border-color: var(--border-color);
-    --waline-bg-color: var(--card-bg);
-    --waline-text-color: var(--btn-content);
-    --waline-secondary-color: var(--content-meta);
-    --waline-reply-color: var(--primary);
-    --waline-max-comment-width: 100%;
+  /* 暗色主题下用亮色文字，保证“加黑”后依然清晰可读 */
+  .dark #waline {
+    --waline-color: rgba(255, 255, 255, 0.92);
+    --waline-info-color: rgba(255, 255, 255, 0.78);
+    --waline-dark-grey: rgba(255, 255, 255, 0.85);
+    --waline-info-bg-color: rgba(255, 255, 255, 0.08);
   }
 
-  .dark {
-    --waline-theme-color: var(--primary);
-    --waline-border-color: var(--border-color);
-    --waline-bg-color: var(--card-bg);
-    --waline-text-color: var(--btn-content);
-    --waline-secondary-color: var(--content-meta);
-    --waline-reply-color: var(--primary);
+  /* 评论正文、昵称、时间等信息文字加粗一点 */
+  #waline .wl-content,
+  #waline .wl-content p,
+  #waline .wl-nick,
+  #waline .wl-time,
+  #waline .wl-meta > span {
+    font-weight: 500;
+  }
+
+  /* 正文颜色兜底，保证无论 Markdown 结构如何都使用加黑后的颜色 */
+  #waline .wl-content {
+    color: var(--waline-color);
+  }
+
+  /* 关闭 IP 属地显示：Waline 会把评论的 addr（归属地）渲染成评论卡片底部的 .wl-addr 徽标 */
+  #waline .wl-addr {
+    display: none !important;
   }
 </style>

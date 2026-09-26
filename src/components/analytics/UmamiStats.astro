@@ -85,15 +85,18 @@ function formatNumber(num: number): string {
 		align-items: center;
 		gap: 0.5rem;
 		font-size: 0.8125rem;
-		color: var(--text-secondary, #6b7280);
+		/* 继承父级文字颜色（页脚为加黑加粗文本），保持与页脚一致 */
+		color: inherit;
+		font-weight: 600;
 	}
 	.umami-stats-divider { color: inherit; opacity: 0.4; }
 	.umami-stats-link {
-		color: var(--primary, #2563eb);
+		color: inherit;
+		font-weight: inherit;
 		text-decoration: none;
-		transition: opacity 0.2s;
+		transition: color 0.2s, opacity 0.2s;
 	}
-	.umami-stats-link:hover { opacity: 0.8; text-decoration: underline; }
+	.umami-stats-link:hover { color: var(--primary, #2563eb); text-decoration: underline; }
 	.umami-stats-disabled { opacity: 0.5; }
 	.umami-stats-iframe {
 		width: 100%;
